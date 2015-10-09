@@ -83,7 +83,7 @@ func removeServicesIfNeeded(servicesInDir *[]string, knownServices *map[string]S
 	}
 }
 
-func createNewServicesIfNeeded(servicesInDir *[]string, knownServices map[string]*Service, servicePath *string) {
+func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[string]*Service, servicePath *string) {
 	done := make(chan bool)
 	count := 0
 	for _, dir := range *servicesInDir {
@@ -92,7 +92,7 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices map[string
 			continue
 		}
 
-		_, ok := knownServices[dir]
+		_, ok := (*knownServices)[dir]
 
 		if dir == "" || ok == true {
 			continue
@@ -103,7 +103,7 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices map[string
 			createService(dir, *servicePath)
 			srv := new(Service)
 			srv.Value = dir
-			knownServices[dir] = srv
+			(*knownServices)[dir] = srv
 			count++
 			done <- true
 		}()

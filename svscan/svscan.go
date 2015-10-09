@@ -34,7 +34,7 @@ func main() {
 	for {
 		knownServices := getServices()
 		servicesInDir := readServiceDir(servicePath)
-		createNewServicesIfNeeded(&servicesInDir, knownServices, servicePath)
+		createNewServicesIfNeeded(&servicesInDir, &knownServices, servicePath)
 
 		for key, elem := range knownServices {
 			key := key
