@@ -31,7 +31,7 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	srvDone := make(chan error, 1)
 
-	signal.Notify(sigs, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGKILL)
 
 	cmdName := *servicePath + "/run"
 	logger.Warning(fmt.Sprintf("Starting up SUPER VISOR for %s", cmdName))
