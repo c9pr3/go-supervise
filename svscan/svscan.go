@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 	//	"os/signal"
-	//	"syscall"
+	"syscall"
 	"time"
 )
 
@@ -85,6 +85,7 @@ func main() {
 
 func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
 	elem.Cmd = exec.Command("/Users/chris/private_git/go-supervise/supervise/supervise", "-path", "/"+value)
+	elem.Cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	go func(elem *Service) {
 		elem.Cmd.Start()
 		fmt.Printf("Starting %s, %s\n", elem.Cmd.Process, elem.Value)

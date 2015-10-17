@@ -63,57 +63,18 @@ func removeServiceAfter(servicesInDir *[]string, key string, elem *Service, srvD
 	}
 
 	if !found {
-		fmt.Printf("After: Could not find %s. Killing %s\n", key, (*elem).Cmd.Process)
-		err := fmt.Errorf("Invalid service %s, %s", key, (*elem).Cmd.Process)
+		fmt.Printf("service %s gone, killing %s\n", key, (*elem).Cmd.Process)
+		err := fmt.Errorf("service %s gone, %s", key, (*elem).Cmd.Process)
 		deleteService(key)
-		elem.Cmd.Process.Kill()
-		srvDone <- elem.Cmd.Wait()
+		//syscall.Kill(syscall.Getpid(), syscall.SIGHUP)
+
+		srvDone <- elem.Cmd.Process.Kill()
+		//syscall.SIGHUP)
+		//srvDone <- elem.Cmd.Wait()
 		return err
 	}
 
 	return nil
-	/*
-		done := make(chan bool)
-		count := 0
-			for id, _ := range *knownServices {
-				knownServices := knownServices
-				found := false
-
-				for _, dir := range *servicesInDir {
-					if dir == id {
-						found = true
-					}
-				}
-
-				if !found {
-					fmt.Printf("Could not find %s\n", id)
-					fmt.Printf("srv %s %s\n", (*knownServices)[id])
-					deleteService(id)
-					cmd := (*knownServices)[id].Cmd
-					if cmd != nil {
-						process := cmd.Process
-						fmt.Printf("process: %s\n", process)
-						if process != nil {
-							err := process.Kill
-							if err != nil {
-							} else {
-							}
-						} else {
-							fmt.Printf("process of %s is nil\n", id)
-						}
-					}
-					delete(*knownServices, id)
-				}
-			}
-
-			if count > 0 {
-				fmt.Printf("i is %d", count)
-				for i := 0; i <= count; i++ {
-					fmt.Printf("i is %d", i)
-					<-done
-				}
-			}
-	*/
 }
 
 func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[string]*Service, servicePath *string) {
