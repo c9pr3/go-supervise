@@ -54,7 +54,7 @@ func removeServiceBefore(servicesInDir *[]string, key string) error {
 	return nil
 }
 
-func removeServiceIfNeeded(servicesInDir *[]string, key string, elem *Service, srvDone chan error) error {
+func removeServiceAfter(servicesInDir *[]string, key string, elem *Service, srvDone chan error) error {
 	found := false
 	for _, dir := range *servicesInDir {
 		if dir == key {
@@ -63,8 +63,11 @@ func removeServiceIfNeeded(servicesInDir *[]string, key string, elem *Service, s
 	}
 
 	if !found {
-		fmt.Printf("Did not find %s, %s\n", key, *elem)
-		err := fmt.Errorf("Invalid service %s, %s", key, *elem)
+		fmt.Printf("After: Could not find %s. Killing %s\n", key, (*elem).Cmd.Process)
+		err := fmt.Errorf("Invalid service %s, %s", key, (*elem).Cmd.Process)
+		deleteService(key)
+		elem.Cmd.Process.Kill()
+		srvDone <- elem.Cmd.Wait()
 		return err
 	}
 
@@ -83,7 +86,7 @@ func removeServiceIfNeeded(servicesInDir *[]string, key string, elem *Service, s
 				}
 
 				if !found {
-					fmt.Printf("Did not find %s\n", id)
+					fmt.Printf("Could not find %s\n", id)
 					fmt.Printf("srv %s %s\n", (*knownServices)[id])
 					deleteService(id)
 					cmd := (*knownServices)[id].Cmd
@@ -117,7 +120,7 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 	done := make(chan bool)
 	count := 0
 
-	fmt.Printf("known services %s\n", *knownServices)
+	//fmt.Printf("known services %s\n", *knownServices)
 
 	for _, dir := range *servicesInDir {
 		dir := dir
@@ -140,7 +143,6 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 			count++
 			done <- true
 		}()
-
 	}
 
 	if count > 0 {

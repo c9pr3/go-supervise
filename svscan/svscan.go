@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
-	"syscall"
+	//	"os/signal"
+	//	"syscall"
 	"time"
 )
 
@@ -31,20 +31,20 @@ func main() {
 
 	runningServices := make(map[string]*Service)
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGKILL)
-	go func() {
-		sig := <-sigs
-		if sig == syscall.SIGTERM {
-			fmt.Printf(fmt.Sprintf("caught signal: \n", sig))
+	/*
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGINT) //, os.Interrupt)
+		go func() {
+			sig := <-sigs
+			fmt.Printf(fmt.Sprintf("caught signal: %s\n", sig))
 			/*
-				err := cmd.Process.Kill()
-				if err != nil {
-					fmt.Printf("Caught error: %v\n", err)
+				for _, elem := range runningServices {
+					if err := elem.Cmd.Process.Kill(); err != nil {
+						panic(err)
+					}
 				}
-			*/
-		}
-	}()
+		}()
+	*/
 
 	for {
 		knownServices := getServices()
@@ -68,9 +68,11 @@ func main() {
 					}
 				}()
 			} else {
-				err := removeServiceIfNeeded(&servicesInDir, key, elem, srvDone)
+				err := removeServiceAfter(&servicesInDir, key, runningServices[key], srvDone)
 				if err == nil {
 					fmt.Printf("%s already running\n", key)
+				} else {
+					delete(runningServices, key)
 				}
 			}
 		}
@@ -95,8 +97,13 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 			fmt.Printf("process done with error = %v\n", err)
 			startService(srvDone, elem, runningServices, key, value)
 		} else {
-			fmt.Printf("process %s interrupted\n", elem.Cmd.Process)
-			startService(srvDone, elem, runningServices, key, value)
+			fmt.Printf("process %s interrupted\n", key)
+			// let's see if this service still exists
+			knownServices := getServices()
+			if _, ok := knownServices[key]; ok != false {
+				fmt.Printf("process %s still in known services, restarting\n", key)
+				startService(srvDone, elem, runningServices, key, value)
+			}
 		}
 	}
 }
