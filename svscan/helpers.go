@@ -45,9 +45,9 @@ func removeServiceBefore(servicesInDir *[]string, key string) error {
 	}
 
 	if !found {
-		fmt.Printf("Did not find %s, %s\n", key)
+		fmt.Printf("Before: Did not find %s, %s\n", key)
 		deleteService(key)
-		err := fmt.Errorf("Invalid service %s, %s", key)
+		err := fmt.Errorf("Before: Invalid service %s, %s", key)
 		return err
 	}
 

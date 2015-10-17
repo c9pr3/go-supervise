@@ -14,9 +14,9 @@ type Service struct {
 	Cmd   *exec.Cmd
 }
 
-func deleteService(id string) {
-	fmt.Printf("removing service %s\n", id)
-	getClient().Delete(context.Background(), id, nil)
+func deleteService(serviceName string) {
+	fmt.Printf("removing service %s\n", serviceName)
+	getClient().Delete(context.Background(), "supervise/"+getHostName()+"/"+serviceName, nil)
 }
 
 func createService(serviceName string, servicePath string) {
