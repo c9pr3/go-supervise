@@ -54,17 +54,24 @@ func main() {
 		for key, elem := range knownServices {
 			key := key
 			elem := elem
+
 			srvDone := make(chan error, 1)
 
 			_, ok := runningServices[key]
 			if ok != true {
 				go func() {
-					fmt.Printf("%s not yet running\n", key)
-					value := string(elem.Value)
-					startService(srvDone, elem, runningServices, key, value)
+					err := removeServiceBefore(&servicesInDir, key)
+					if err == nil {
+						fmt.Printf("%s not yet running\n", key)
+						value := string(elem.Value)
+						startService(srvDone, elem, runningServices, key, value)
+					}
 				}()
 			} else {
-				//				fmt.Printf("%s already running\n", key)
+				err := removeServiceIfNeeded(&servicesInDir, key, elem, srvDone)
+				if err == nil {
+					fmt.Printf("%s already running\n", key)
+				}
 			}
 		}
 
@@ -78,7 +85,7 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	elem.Cmd = exec.Command("/Users/chris/private_git/go-supervise/supervise/supervise", "-path", "/"+value)
 	go func(elem *Service) {
 		elem.Cmd.Start()
-		fmt.Printf("Starting %s\n", elem.Cmd.Process)
+		fmt.Printf("Starting %s, %s\n", elem.Cmd.Process, elem.Value)
 		runningServices[key] = elem
 		srvDone <- elem.Cmd.Wait()
 	}(elem)

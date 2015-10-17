@@ -21,13 +21,13 @@ func deleteService(id string) {
 
 func createService(serviceName string, servicePath string) {
 	fmt.Printf("createServiceInDb - %s\n", serviceName)
-	getClient().Create(context.Background(), "supervise/"+serviceName, servicePath+"/"+serviceName)
+	getClient().Create(context.Background(), "supervise/"+getHostName()+"/"+serviceName, servicePath+"/"+serviceName)
 }
 
 func getServices() map[string]*Service {
 	services := make(map[string]*Service)
 
-	client, err := getClient().Get(context.Background(), "supervise", nil)
+	client, err := getClient().Get(context.Background(), "supervise/"+getHostName(), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +36,7 @@ func getServices() map[string]*Service {
 		for _, key := range values {
 			service := new(Service)
 			service.Value = key.Value
-			services[strings.Replace(key.Key, "/supervise/", "", 1)] = service
+			services[strings.Replace(key.Key, "/supervise/"+getHostName()+"/", "", 1)] = service
 		}
 	}
 
@@ -54,7 +54,7 @@ func getClient() client.KeysAPI {
 		panic(err)
 	}
 	cc := client.NewKeysAPI(c)
-	cc.Set(context.Background(), "supervise", "", &client.SetOptions{Dir: true})
+	cc.Set(context.Background(), "supervise/"+getHostName(), "", &client.SetOptions{Dir: true})
 
 	return cc
 }

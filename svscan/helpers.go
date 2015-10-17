@@ -36,56 +36,89 @@ func removeSlashes(s *string) *string {
 	return &p
 }
 
-func removeServicesIfNeeded(servicesInDir *[]string, knownServices *map[string]Service) {
-	done := make(chan bool)
-	count := 0
-
-	for id, _ := range *knownServices {
-		knownServices := knownServices
-		fmt.Printf("srv %s %s\n", (*knownServices)[id])
-		found := false
-
-		for _, dir := range *servicesInDir {
-			if dir == id {
-				found = true
-			}
+func removeServiceBefore(servicesInDir *[]string, key string) error {
+	found := false
+	for _, dir := range *servicesInDir {
+		if dir == key {
+			found = true
 		}
+	}
 
-		if !found {
-			fmt.Printf("Did not find %s\n", id)
-			fmt.Printf("srv %s %s\n", (*knownServices)[id])
-			deleteService(id)
-			/*
-			* @todo shut down process
-			 */
-			/*
-				process := cmd.Process
-				if process != nil {
-					err := process.Kill
-					if err != nil {
-					} else {
+	if !found {
+		fmt.Printf("Did not find %s, %s\n", key)
+		deleteService(key)
+		err := fmt.Errorf("Invalid service %s, %s", key)
+		return err
+	}
+
+	return nil
+}
+
+func removeServiceIfNeeded(servicesInDir *[]string, key string, elem *Service, srvDone chan error) error {
+	found := false
+	for _, dir := range *servicesInDir {
+		if dir == key {
+			found = true
+		}
+	}
+
+	if !found {
+		fmt.Printf("Did not find %s, %s\n", key, *elem)
+		err := fmt.Errorf("Invalid service %s, %s", key, *elem)
+		return err
+	}
+
+	return nil
+	/*
+		done := make(chan bool)
+		count := 0
+			for id, _ := range *knownServices {
+				knownServices := knownServices
+				found := false
+
+				for _, dir := range *servicesInDir {
+					if dir == id {
+						found = true
 					}
-				} else {
-					fmt.Printf("process of %s is nil\n", id)
 				}
-			*/
-			delete(*knownServices, id)
-		}
 
-	}
+				if !found {
+					fmt.Printf("Did not find %s\n", id)
+					fmt.Printf("srv %s %s\n", (*knownServices)[id])
+					deleteService(id)
+					cmd := (*knownServices)[id].Cmd
+					if cmd != nil {
+						process := cmd.Process
+						fmt.Printf("process: %s\n", process)
+						if process != nil {
+							err := process.Kill
+							if err != nil {
+							} else {
+							}
+						} else {
+							fmt.Printf("process of %s is nil\n", id)
+						}
+					}
+					delete(*knownServices, id)
+				}
+			}
 
-	if count > 0 {
-		fmt.Printf("i is %d", count)
-		for i := 0; i <= count; i++ {
-			fmt.Printf("i is %d", i)
-			<-done
-		}
-	}
+			if count > 0 {
+				fmt.Printf("i is %d", count)
+				for i := 0; i <= count; i++ {
+					fmt.Printf("i is %d", i)
+					<-done
+				}
+			}
+	*/
 }
 
 func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[string]*Service, servicePath *string) {
 	done := make(chan bool)
 	count := 0
+
+	fmt.Printf("known services %s\n", *knownServices)
+
 	for _, dir := range *servicesInDir {
 		dir := dir
 		if dir == "" {
@@ -117,4 +150,12 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 			<-done
 		}
 	}
+}
+
+func getHostName() string {
+	hostName, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+	return hostName
 }
