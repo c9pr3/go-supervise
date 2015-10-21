@@ -36,16 +36,17 @@ func main() {
 	cmdName := *servicePath + "/run"
 	logger.Warning(fmt.Sprintf("Starting up SUPER VISOR for %s", cmdName))
 	cmd := exec.Command(cmdName)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	go func() {
 		sig := <-sigs
-		if sig == syscall.SIGTERM {
-			logger.Warning(fmt.Sprintf("caught signal: ", sig))
-			err := cmd.Process.Kill()
-			if err != nil {
-				logger.Warning(fmt.Sprintf("Caught error: %v", err))
-			}
+		//if sig == syscall.SIGTERM {
+		logger.Warning(fmt.Sprintf("caught signal: ", sig))
+		err := cmd.Process.Kill()
+		if err != nil {
+			logger.Warning(fmt.Sprintf("Caught error: %v", err))
 		}
+		//}
 	}()
 	logger.Warning(fmt.Sprintf("Running %s\n", cmdName))
 	go func() {
@@ -59,7 +60,7 @@ func main() {
 		}
 	}
 
-	logger.Warning(fmt.Sprintf("Shutting down %s", cmdName))
+	logger.Warning(fmt.Sprintf("%s shutted down", cmdName))
 }
 
 func usage(code int) {
