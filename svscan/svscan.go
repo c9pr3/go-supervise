@@ -3,12 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/syslog"
 	"os"
 	"os/exec"
 	//	"os/signal"
 	//"syscall"
 	"time"
 )
+
+var LOGGER, LOGERR = syslog.New(syslog.LOG_WARNING, "svscan")
 
 const (
 	VERSION = "0.1"
@@ -25,9 +28,14 @@ func main() {
 	}
 
 	servicePath = removeSlashes(servicePath)
+
+	if LOGERR != nil {
+		panic(LOGERR)
+	}
+
 	getClient()
 
-	fmt.Printf("Scanning %s\n", *servicePath)
+	LOGGER.Warning(fmt.Sprintf("Scanning %s\n", *servicePath))
 
 	runningServices := make(map[string]*Service)
 
@@ -62,7 +70,7 @@ func main() {
 				go func() {
 					err := removeServiceBefore(&servicesInDir, key)
 					if err == nil {
-						fmt.Printf("%s not yet running\n", key)
+						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", key))
 						value := string(elem.Value)
 						startService(srvDone, elem, runningServices, key, value)
 					}
@@ -70,7 +78,7 @@ func main() {
 			} else {
 				err := removeServiceAfter(&servicesInDir, key, runningServices[key], srvDone)
 				if err == nil {
-					fmt.Printf("%s already running\n", key)
+					LOGGER.Debug(fmt.Sprintf("%s already running\n", key))
 				} else {
 					delete(runningServices, key)
 				}
@@ -86,25 +94,26 @@ func main() {
 func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
 	//elem.Cmd = exec.Command("/Users/chris/private_git/go-supervise/supervise/supervise", "-path", "/"+value)
 	knownServices := getServices()
-	if _, ok := knownServices[key]; ok != false {
-		fmt.Printf("Starting %s\n", value)
-		elem.Cmd = exec.Command("/" + value + "/run")
-		//elem.Cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-		go func(elem *Service) {
-			elem.Cmd.Start()
-			fmt.Printf("Starting %s, %s\n", elem.Cmd.Process, elem.Value)
-			runningServices[key] = elem
-			srvDone <- elem.Cmd.Wait()
-		}(elem)
-		select {
-		case err := <-srvDone:
-			if err != nil {
-				fmt.Printf("process done with error = %v\n", err)
-				startService(srvDone, elem, runningServices, key, value)
-			} else {
-				fmt.Printf("process %s interrupted\n", key)
-				startService(srvDone, elem, runningServices, key, value)
-			}
+	if _, ok := knownServices[key]; ok != true {
+		return
+	}
+	LOGGER.Info(fmt.Sprintf("Starting %s\n", value))
+	elem.Cmd = exec.Command("/" + value + "/run")
+	//elem.Cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	go func(elem *Service) {
+		elem.Cmd.Start()
+		LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
+		runningServices[key] = elem
+		srvDone <- elem.Cmd.Wait()
+	}(elem)
+	select {
+	case err := <-srvDone:
+		if err != nil {
+			LOGGER.Warning(fmt.Sprintf("process done with error = %v\n", err))
+			startService(srvDone, elem, runningServices, key, value)
+		} else {
+			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))
+			startService(srvDone, elem, runningServices, key, value)
 		}
 	}
 }
