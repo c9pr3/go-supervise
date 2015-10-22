@@ -85,26 +85,24 @@ func main() {
 
 func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
 	//elem.Cmd = exec.Command("/Users/chris/private_git/go-supervise/supervise/supervise", "-path", "/"+value)
-	fmt.Printf("Starting %s\n", value)
-	elem.Cmd = exec.Command("/" + value + "/run")
-	//elem.Cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	go func(elem *Service) {
-		elem.Cmd.Start()
-		fmt.Printf("Starting %s, %s\n", elem.Cmd.Process, elem.Value)
-		runningServices[key] = elem
-		srvDone <- elem.Cmd.Wait()
-	}(elem)
-	select {
-	case err := <-srvDone:
-		if err != nil {
-			fmt.Printf("process done with error = %v\n", err)
-			startService(srvDone, elem, runningServices, key, value)
-		} else {
-			fmt.Printf("process %s interrupted\n", key)
-			// let's see if this service still exists
-			knownServices := getServices()
-			if _, ok := knownServices[key]; ok != false {
-				fmt.Printf("process %s still in known services, restarting\n", key)
+	knownServices := getServices()
+	if _, ok := knownServices[key]; ok != false {
+		fmt.Printf("Starting %s\n", value)
+		elem.Cmd = exec.Command("/" + value + "/run")
+		//elem.Cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		go func(elem *Service) {
+			elem.Cmd.Start()
+			fmt.Printf("Starting %s, %s\n", elem.Cmd.Process, elem.Value)
+			runningServices[key] = elem
+			srvDone <- elem.Cmd.Wait()
+		}(elem)
+		select {
+		case err := <-srvDone:
+			if err != nil {
+				fmt.Printf("process done with error = %v\n", err)
+				startService(srvDone, elem, runningServices, key, value)
+			} else {
+				fmt.Printf("process %s interrupted\n", key)
 				startService(srvDone, elem, runningServices, key, value)
 			}
 		}
