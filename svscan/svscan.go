@@ -88,7 +88,7 @@ func main() {
 		time.Sleep(5 * time.Second)
 	}
 
-	fmt.Println("exiting")
+	LOGGER.Warning("exiting")
 }
 
 func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
@@ -109,7 +109,7 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	select {
 	case err := <-srvDone:
 		if err != nil {
-			LOGGER.Warning(fmt.Sprintf("process done with error = %v\n", err))
+			LOGGER.Warning(fmt.Sprintf("process %s done with error = %v\n", key, err))
 			startService(srvDone, elem, runningServices, key, value)
 		} else {
 			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))

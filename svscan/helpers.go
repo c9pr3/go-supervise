@@ -45,7 +45,7 @@ func removeServiceBefore(servicesInDir *[]string, key string) error {
 	}
 
 	if !found {
-		fmt.Printf("Before: Did not find %s, %s\n", key)
+		LOGGER.Debug(fmt.Sprintf("Before: Did not find %s, %s\n", key))
 		deleteService(key)
 		err := fmt.Errorf("Before: Invalid service %s, %s", key)
 		return err
@@ -63,7 +63,7 @@ func removeServiceAfter(servicesInDir *[]string, key string, elem *Service, srvD
 	}
 
 	if !found {
-		fmt.Printf("service %s gone, killing %s\n", key, (*elem).Cmd.Process)
+		LOGGER.Warning(fmt.Sprintf("service %s gone, killing %s\n", key, (*elem).Cmd.Process))
 		err := fmt.Errorf("service %s gone, %s", key, (*elem).Cmd.Process)
 		deleteService(key)
 		//syscall.Kill(syscall.Getpid(), syscall.SIGHUP)
@@ -81,8 +81,6 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 	done := make(chan bool)
 	count := 0
 
-	//fmt.Printf("known services %s\n", *knownServices)
-
 	for _, dir := range *servicesInDir {
 		dir := dir
 		if dir == "" {
@@ -96,7 +94,7 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 		}
 
 		go func() {
-			fmt.Printf("creating new service %s, %s\n", dir, ok)
+			LOGGER.Info(fmt.Sprintf("creating new service %s, %s\n", dir, ok))
 			createService(dir, *servicePath)
 			srv := new(Service)
 			srv.Value = dir
@@ -107,9 +105,7 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 	}
 
 	if count > 0 {
-		fmt.Printf("i is %d", count)
 		for i := 0; i <= count; i++ {
-			fmt.Printf("i is %d", i)
 			<-done
 		}
 	}

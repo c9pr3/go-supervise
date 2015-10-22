@@ -15,12 +15,12 @@ type Service struct {
 }
 
 func deleteService(serviceName string) {
-	fmt.Printf("removing service %s\n", serviceName)
+	LOGGER.Debug(fmt.Sprintf("removing service %s\n", serviceName))
 	getClient().Delete(context.Background(), "supervise/"+getHostName()+"/"+serviceName, nil)
 }
 
 func createService(serviceName string, servicePath string) {
-	fmt.Printf("createServiceInDb - %s\n", serviceName)
+	LOGGER.Debug(fmt.Sprintf("createServiceInDb - %s\n", serviceName))
 	getClient().Create(context.Background(), "supervise/"+getHostName()+"/"+serviceName, servicePath+"/"+serviceName)
 }
 
