@@ -26,3 +26,7 @@ git clone https://github.com/Adar/go-supervise
 cd go-supervise/svscan
 ./svscan -path ~/services/
 ```
+
+## License
+
+MIT license, see LICENSE.txt for details.
