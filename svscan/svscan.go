@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
+	//	"bytes"
 	"flag"
 	"fmt"
-	"io"
+	//	"io"
 	"log/syslog"
 	"os"
 	"os/exec"
@@ -39,7 +39,8 @@ func main() {
 
 	if _, err := os.Stat("/" + *servicePath); err != nil {
 		if crErr := os.Mkdir("/"+*servicePath, 0755); crErr != nil {
-			LOGGER.Crit(fmt.Sprintf("Scanning %s failed - directory does not exist\n", *servicePath))
+			LOGGER.Crit(fmt.Sprintf("Scanning %s failed - directory does not exist and is not creatable\n", *servicePath))
+			fmt.Printf("Scanning %s failed - directory does not exist and is not creatable\n", *servicePath)
 			usage(1)
 		}
 	}
@@ -106,26 +107,27 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	LOGGER.Warning(fmt.Sprintf("Starting %s\n", value))
 
 	elem.Cmd = exec.Command("/" + value + "/run")
-	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
+	//	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
 	func(elem *Service) {
 
-		reader, writer := io.Pipe()
+		//_, writer := io.Pipe()
 		//@TODO rewrite multilog so that it can take stderr and stdout separately
-		elem.Cmd.Stderr = writer
-		elem.Cmd.Stdout = writer
-		elem.LogCmd.Stdin = reader
+		//elem.Cmd.Stderr = writer
+		//elem.Cmd.Stdout = writer
+		//		elem.LogCmd.Stdin = reader
 
-		var buf bytes.Buffer
-		elem.LogCmd.Stdout = &buf
+		//var buf bytes.Buffer
+		//		elem.LogCmd.Stdout = &buf
 
 		if err := elem.Cmd.Start(); err != nil {
 			LOGGER.Crit(fmt.Sprintf("service %s not startable: %s", key, err))
 		}
-		elem.LogCmd.Start()
+		//		elem.LogCmd.Start()
 		LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
 
 		runningServices[key] = elem
 		srvDone <- elem.Cmd.Wait()
+		//		srvDone <- elem.LogCmd.Wait()
 	}(elem)
 	select {
 	case err := <-srvDone:
@@ -136,6 +138,14 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))
 			startService(srvDone, elem, runningServices, key, value)
 		}
+		/*
+			case err := <-multiLogDone:
+				if err != nil {
+					LOGGER.Warning(fmt.Sprintf("multilog process %s done with error = %v\n", key, err))
+				} else {
+					LOGGER.Warning(fmt.Sprintf("multilog process %s interrupted\n", key))
+				}
+		*/
 	}
 }
 
