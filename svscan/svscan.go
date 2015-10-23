@@ -2,9 +2,10 @@ package main
 
 import (
 	//	"bytes"
+	"bufio"
 	"flag"
 	"fmt"
-	//	"io"
+	"io"
 	"log/syslog"
 	"os"
 	"os/exec"
@@ -106,29 +107,44 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	}
 	LOGGER.Warning(fmt.Sprintf("Starting %s\n", value))
 
-	elem.Cmd = exec.Command("/" + value + "/run")
-	//	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
-	func(elem *Service) {
+	elem.Cmd = exec.Command("/" + value + "/run") // |& ./../multilog/multilog -path /" + value)
 
-		//_, writer := io.Pipe()
-		//@TODO rewrite multilog so that it can take stderr and stdout separately
-		//elem.Cmd.Stderr = writer
-		//elem.Cmd.Stdout = writer
-		//		elem.LogCmd.Stdin = reader
+	stdout, _ := elem.Cmd.StdoutPipe()
 
-		//var buf bytes.Buffer
-		//		elem.LogCmd.Stdout = &buf
+	if err := elem.Cmd.Start(); err != nil {
+		LOGGER.Crit(fmt.Sprintf("service %s not startable: %s", key, err))
+		return
+	}
+	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
 
-		if err := elem.Cmd.Start(); err != nil {
-			LOGGER.Crit(fmt.Sprintf("service %s not startable: %s", key, err))
+	//@TODO rewrite multilog so that it can take stderr and stdout separately
+	go func(key string, value string, stdout io.ReadCloser) {
+		stdOutBuff := bufio.NewScanner(stdout)
+		cmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
+		inp, err := cmd.StdinPipe()
+		if err != nil {
+			panic(err)
 		}
-		//		elem.LogCmd.Start()
-		LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
+		err = cmd.Start()
+		if err != nil {
+			panic(err)
+		}
 
-		runningServices[key] = elem
-		srvDone <- elem.Cmd.Wait()
-		//		srvDone <- elem.LogCmd.Wait()
-	}(elem)
+		var allText []string
+		for stdOutBuff.Scan() {
+			allText = append(allText, stdOutBuff.Text()+"\n")
+			// @TODO redefine > 10 to real value
+			if len(allText) > 1 {
+				fmt.Printf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), inp)
+				inp.Write([]byte(stdOutBuff.Text()))
+				allText = nil
+			}
+		}
+		cmd.Wait()
+	}(key, value, stdout)
+
+	runningServices[key] = elem
+	srvDone <- elem.Cmd.Wait()
 	select {
 	case err := <-srvDone:
 		if err != nil {
@@ -138,14 +154,6 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))
 			startService(srvDone, elem, runningServices, key, value)
 		}
-		/*
-			case err := <-multiLogDone:
-				if err != nil {
-					LOGGER.Warning(fmt.Sprintf("multilog process %s done with error = %v\n", key, err))
-				} else {
-					LOGGER.Warning(fmt.Sprintf("multilog process %s interrupted\n", key))
-				}
-		*/
 	}
 }
 
