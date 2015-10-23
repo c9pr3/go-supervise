@@ -7,10 +7,10 @@ You may start up with an empty (or not even existing) service-dir and create the
 You may delete a service sub-directory (e.g. ~/services/srv1) while `go-supervise` is running. It will detect the deletion and shut down the service.
 
 For now, `go-supervise` uses [etcd](https://github.com/coreos/etcd) to save known services, because later on
->- It should be possible to add a service in etcd database and let `go-supervise` start it up on the correct server.
+>- It should be possible to add a service in etcd database and let `go-supervise` starts it up on the correct server.
 >- It should be possible to remove a service in etcd database and let `go-supervise` shut it down.
 
-etcd is expected to run on **127.0.0.1:2379**, which is default. Later on `go-supervise` will have a configuration file.
+etcd is expected on **127.0.0.1:2379**, which is default. Later on `go-supervise` will have a configuration file.
 
 ## documentation
 Not existent yet, Sorry :-)
@@ -28,6 +28,9 @@ cd go-supervise/svscan
 ./svscan -path ~/services/
 ```
 
-## License
+## known bugs
+If the multilog process is killed, it won't start up again leaving the service
+without any logging.
 
+## License
 MIT license, see LICENSE.txt for details.
