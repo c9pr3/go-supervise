@@ -21,19 +21,18 @@ func main() {
 
 	servicePath := flag.String("path", "", "service path")
 	flag.Parse()
+	if LOGERR != nil {
+		panic(LOGERR)
+	}
+	LOGGER.Warning("multilog starting up " + *servicePath)
 
 	if len(flag.Args()) != 0 {
+		LOGGER.Crit("not enough arguments")
 		fmt.Printf("not enough arguments - %s\n", *servicePath)
 		os.Exit(1)
 	}
 
 	servicePath = removeSlashes(servicePath)
-
-	if LOGERR != nil {
-		panic(LOGERR)
-	}
-
-	LOGGER.Info("multilog starting up " + *servicePath)
 
 	logger.Init("/"+*servicePath+"/log",
 		50,    // maximum logfiles allowed under the specified log directory
@@ -51,17 +50,21 @@ func main() {
 			for {
 				input, err := reader.ReadString('\n')
 				if err != nil && err == io.EOF {
+					LOGGER.Crit(fmt.Sprintf("input read error %s", err))
 					break
 				}
+				// remove trailing newline
 				input = input[0 : len(input)-1]
 
 				timeStamp := tai64n.Now().Label()
+
+				LOGGER.Crit(fmt.Sprintf("input received %s", input))
 				logger.Info("%s %s", timeStamp, input)
 			}
 		}
 	}
 
-	LOGGER.Info("multilog shutting down\n")
+	LOGGER.Crit("multilog shutting down\n")
 }
 
 func removeSlashes(s *string) *string {

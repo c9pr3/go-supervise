@@ -121,7 +121,8 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	go func(key string, value string, stdout io.ReadCloser) {
 		stdOutBuff := bufio.NewScanner(stdout)
 		cmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
-		inp, err := cmd.StdinPipe()
+		stdin, err := cmd.StdinPipe()
+		defer stdin.Close()
 		if err != nil {
 			panic(err)
 		}
@@ -130,15 +131,15 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 			panic(err)
 		}
 
-		var allText []string
+		//		var allText []string
 		for stdOutBuff.Scan() {
-			allText = append(allText, stdOutBuff.Text()+"\n")
+			//			allText = append(allText, stdOutBuff.Text()+"\n")
 			// @TODO redefine > 10 to real value
-			if len(allText) > 1 {
-				fmt.Printf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), inp)
-				inp.Write([]byte(stdOutBuff.Text()))
-				allText = nil
-			}
+			//			if len(allText) > 10 {
+			LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), stdin))
+			io.WriteString(stdin, stdOutBuff.Text()+"\n")
+			//			allText = nil
+			//			}
 		}
 		cmd.Wait()
 	}(key, value, stdout)
