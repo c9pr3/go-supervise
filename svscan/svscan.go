@@ -37,6 +37,13 @@ func main() {
 
 	LOGGER.Warning(fmt.Sprintf("Scanning %s\n", *servicePath))
 
+	if _, err := os.Stat("/" + *servicePath); err != nil {
+		if crErr := os.Mkdir("/"+*servicePath, 0755); crErr != nil {
+			LOGGER.Crit(fmt.Sprintf("Scanning %s failed - directory does not exist\n", *servicePath))
+			usage(1)
+		}
+	}
+
 	runningServices := make(map[string]*Service)
 
 	/*
@@ -96,7 +103,7 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	if _, ok := knownServices[key]; ok != true {
 		return
 	}
-	LOGGER.Info(fmt.Sprintf("Starting %s\n", value))
+	LOGGER.Warning(fmt.Sprintf("Starting %s\n", value))
 
 	elem.Cmd = exec.Command("/" + value + "/run")
 	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)

@@ -25,9 +25,9 @@ func readServiceDir(servicePath *string) []string {
 func removeSlashes(s *string) *string {
 	p := *s
 	for {
-		if p[len(p)-1:len(p)] == "/" {
+		if os.IsPathSeparator((p[len(p)-1 : len(p)])[0]) {
 			p = p[0 : len(p)-1]
-		} else if p[0:1] == "/" {
+		} else if os.IsPathSeparator((p[0:1])[0]) {
 			p = p[1:len(p)]
 		} else {
 			break
