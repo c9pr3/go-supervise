@@ -98,24 +98,23 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	}
 	LOGGER.Info(fmt.Sprintf("Starting %s\n", value))
 
-	//elem.Cmd = exec.Command("/"+value+"/run", "|&", "/Users/chris/private_git/go-supervise/multilog/multilog", "-path", "/"+value)
 	elem.Cmd = exec.Command("/" + value + "/run")
-	multiLogCmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
+	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
 	func(elem *Service) {
 
 		reader, writer := io.Pipe()
 		//@TODO rewrite multilog so that it can take stderr and stdout separately
 		elem.Cmd.Stderr = writer
 		elem.Cmd.Stdout = writer
-		multiLogCmd.Stdin = reader
+		elem.LogCmd.Stdin = reader
 
 		var buf bytes.Buffer
-		multiLogCmd.Stdout = &buf
+		elem.LogCmd.Stdout = &buf
 
 		if err := elem.Cmd.Start(); err != nil {
 			LOGGER.Crit(fmt.Sprintf("service %s not startable: %s", key, err))
 		}
-		multiLogCmd.Start()
+		elem.LogCmd.Start()
 		LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
 
 		runningServices[key] = elem

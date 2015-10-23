@@ -13,6 +13,7 @@ import (
 type Service struct {
 	Value   string
 	Cmd     *exec.Cmd
+	LogCmd  *exec.Cmd
 	LogFile *os.File
 }
 
