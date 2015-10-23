@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/antigloss/go/logger"
+	"github.com/vektra/tai64n"
 	"io"
 	"log/syslog"
 	"os"
@@ -46,9 +47,7 @@ func main() {
 		if (info.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 			// no input
 		} else if info.Size() > 0 {
-			fmt.Printf("found input")
 			reader := bufio.NewReader(os.Stdin)
-			line := 1
 			for {
 				input, err := reader.ReadString('\n')
 				if err != nil && err == io.EOF {
@@ -56,8 +55,8 @@ func main() {
 				}
 				input = input[0 : len(input)-1]
 
-				logger.Info("%2d: %s", line, input)
-				line++
+				timeStamp := tai64n.Now().Label()
+				logger.Info("%s %s", timeStamp, input)
 			}
 		}
 	}
