@@ -16,8 +16,8 @@ etcd is expected to run on **127.0.0.1:2379**, which is default. Later on `go-su
 Not existent yet, Sorry :-)
 
 ## uses
-Antigloss' [Logger](http://github.com/antigloss/go/logger),
-CoreOS [etcd client](http://github.com/coreos/etcd/client)
+Antigloss' [Logger](http://github.com/antigloss/go),
+CoreOS [etcd client](http://github.com/coreos/etcd)
 
 ## usage
 ```
