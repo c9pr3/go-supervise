@@ -1,5 +1,5 @@
 ## what
-Proof of concept and playground for a [daemontools](http://cr.yp.to/daemontools) written in go.
+Proof of concept and playground for a [daemontools](http://cr.yp.to/daemontools.html) written in go.
 The goal is to have a stable service starter which automagically restarts a service if it has been shut down and log (with logrotation) all output.
 
 You may start up with an empty (or not even existing) service-dir and create the services after starting `go-supervise`. As soon as a "run" executable is found, the service be started up.
