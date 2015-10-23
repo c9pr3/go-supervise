@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
 	"github.com/coreos/etcd/client"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
 )
 
 type Service struct {
-	Value string
-	Cmd   *exec.Cmd
+	Value   string
+	Cmd     *exec.Cmd
+	LogFile *os.File
 }
 
 func deleteService(serviceName string) {

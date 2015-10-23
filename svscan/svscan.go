@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log/syslog"
 	"os"
 	"os/exec"
-	//	"os/signal"
-	//"syscall"
 	"time"
 )
 
@@ -62,6 +62,7 @@ func main() {
 		for key, elem := range knownServices {
 			key := key
 			elem := elem
+			value := string(elem.Value)
 
 			srvDone := make(chan error, 1)
 
@@ -71,7 +72,6 @@ func main() {
 					err := removeServiceBefore(&servicesInDir, key)
 					if err == nil {
 						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", key))
-						value := string(elem.Value)
 						startService(srvDone, elem, runningServices, key, value)
 					}
 				}()
@@ -92,17 +92,32 @@ func main() {
 }
 
 func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
-	//elem.Cmd = exec.Command("/Users/chris/private_git/go-supervise/supervise/supervise", "-path", "/"+value)
 	knownServices := getServices()
 	if _, ok := knownServices[key]; ok != true {
 		return
 	}
 	LOGGER.Info(fmt.Sprintf("Starting %s\n", value))
+
+	//elem.Cmd = exec.Command("/"+value+"/run", "|&", "/Users/chris/private_git/go-supervise/multilog/multilog", "-path", "/"+value)
 	elem.Cmd = exec.Command("/" + value + "/run")
-	//elem.Cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	go func(elem *Service) {
-		elem.Cmd.Start()
+	multiLogCmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
+	func(elem *Service) {
+
+		reader, writer := io.Pipe()
+		//@TODO rewrite multilog so that it can take stderr and stdout separately
+		elem.Cmd.Stderr = writer
+		elem.Cmd.Stdout = writer
+		multiLogCmd.Stdin = reader
+
+		var buf bytes.Buffer
+		multiLogCmd.Stdout = &buf
+
+		if err := elem.Cmd.Start(); err != nil {
+			LOGGER.Crit(fmt.Sprintf("service %s not startable: %s", key, err))
+		}
+		multiLogCmd.Start()
 		LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
+
 		runningServices[key] = elem
 		srvDone <- elem.Cmd.Wait()
 	}(elem)
