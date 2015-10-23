@@ -74,6 +74,7 @@ func main() {
 			value := string(elem.Value)
 
 			srvDone := make(chan error, 1)
+			loggerDone := make(chan error, 1)
 
 			_, ok := runningServices[key]
 			if ok != true {
@@ -81,7 +82,7 @@ func main() {
 					err := removeServiceBefore(&servicesInDir, key)
 					if err == nil {
 						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", key))
-						startService(srvDone, elem, runningServices, key, value)
+						startService(srvDone, loggerDone, elem, runningServices, key, value)
 					}
 				}()
 			} else {
@@ -100,7 +101,45 @@ func main() {
 	LOGGER.Warning("exiting")
 }
 
-func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
+func startLogger(loggerDone chan error, value string, cmd *exec.Cmd, stdout io.ReadCloser) {
+
+	//@TODO rewrite multilog so that it can take stderr and stdout separately
+	stdOutBuff := bufio.NewScanner(stdout)
+	stdin, err := cmd.StdinPipe()
+	defer stdin.Close()
+	if err != nil {
+		panic(err)
+	}
+	err = cmd.Start()
+	if err != nil {
+		panic(err)
+	}
+
+	for stdOutBuff.Scan() {
+		LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), stdin))
+		_, err := io.WriteString(stdin, stdOutBuff.Text()+"\n")
+		if err != nil {
+			LOGGER.Crit(fmt.Sprintf("IO gone away for %s", value))
+			cmd.Process.Kill()
+			cmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
+			startLogger(loggerDone, value, cmd, stdout)
+			break
+		}
+	}
+	loggerDone <- cmd.Wait()
+	select {
+	case err := <-loggerDone:
+		if err != nil {
+			LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", value, err))
+			startLogger(loggerDone, value, cmd, stdout)
+		} else {
+			LOGGER.Warning(fmt.Sprintf("logger %s interrupted\n", value))
+			startLogger(loggerDone, value, cmd, stdout)
+		}
+	}
+}
+
+func startService(srvDone chan error, loggerDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
 	knownServices := getServices()
 	if _, ok := knownServices[key]; ok != true {
 		return
@@ -117,32 +156,8 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	}
 	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
 
-	//@TODO rewrite multilog so that it can take stderr and stdout separately
-	go func(key string, value string, stdout io.ReadCloser) {
-		stdOutBuff := bufio.NewScanner(stdout)
-		cmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
-		stdin, err := cmd.StdinPipe()
-		defer stdin.Close()
-		if err != nil {
-			panic(err)
-		}
-		err = cmd.Start()
-		if err != nil {
-			panic(err)
-		}
-
-		//		var allText []string
-		for stdOutBuff.Scan() {
-			//			allText = append(allText, stdOutBuff.Text()+"\n")
-			// @TODO redefine > 10 to real value
-			//			if len(allText) > 10 {
-			LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), stdin))
-			io.WriteString(stdin, stdOutBuff.Text()+"\n")
-			//			allText = nil
-			//			}
-		}
-		cmd.Wait()
-	}(key, value, stdout)
+	cmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
+	go startLogger(loggerDone, value, cmd, stdout)
 
 	runningServices[key] = elem
 	srvDone <- elem.Cmd.Wait()
@@ -150,10 +165,10 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	case err := <-srvDone:
 		if err != nil {
 			LOGGER.Warning(fmt.Sprintf("process %s done with error = %v\n", key, err))
-			startService(srvDone, elem, runningServices, key, value)
+			startService(srvDone, loggerDone, elem, runningServices, key, value)
 		} else {
 			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))
-			startService(srvDone, elem, runningServices, key, value)
+			startService(srvDone, loggerDone, elem, runningServices, key, value)
 		}
 	}
 }

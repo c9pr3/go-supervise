@@ -29,8 +29,8 @@ cd go-supervise/svscan
 ```
 
 ## known bugs
-If the multilog process is killed, it won't start up again leaving the service
-without any logging.
+If the multilog process is killed, it will start up again but leave a zombie
+process behind because of open stdin
 
 ## License
 MIT license, see LICENSE.txt for details.
