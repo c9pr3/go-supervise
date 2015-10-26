@@ -74,7 +74,6 @@ func main() {
 			value := string(elem.Value)
 
 			srvDone := make(chan error, 1)
-			loggerDone := make(chan error, 1)
 
 			_, ok := runningServices[key]
 			if ok != true {
@@ -82,7 +81,7 @@ func main() {
 					err := removeServiceBefore(&servicesInDir, key)
 					if err == nil {
 						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", key))
-						startService(srvDone, loggerDone, elem, runningServices, key, value)
+						startService(srvDone, elem, runningServices, key, value)
 					}
 				}()
 			} else {
@@ -138,7 +137,8 @@ func startLogger(elem *Service, loggerDone chan error, value string, stdout io.R
 	}
 }
 
-func startService(srvDone chan error, loggerDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
+func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, key string, value string) {
+	loggerDone := make(chan error, 1)
 	knownServices := getServices()
 	if _, ok := knownServices[key]; ok != true {
 		return
@@ -162,17 +162,20 @@ func startService(srvDone chan error, loggerDone chan error, elem *Service, runn
 	select {
 	case err := <-srvDone:
 		if err != nil {
-			LOGGER.Warning(fmt.Sprintf("process %s done with error = %v\n", key, err))
+			LOGGER.Warning(fmt.Sprintf("process %s done with error = %v", key, err))
+			LOGGER.Warning(fmt.Sprintf("restarting service %s", key))
 			if elem.LogCmd != nil && elem.LogCmd.Process != nil {
+				LOGGER.Warning(fmt.Sprintf("restarting service-logger 2 %s", key))
 				loggerDone <- elem.LogCmd.Process.Kill()
 			}
-			startService(srvDone, loggerDone, elem, runningServices, key, value)
+			LOGGER.Warning(fmt.Sprintf("restarting service now %s", key))
+			startService(srvDone, elem, runningServices, key, value)
 		} else {
+			LOGGER.Warning(fmt.Sprintf("restarting service %s", key))
 			if elem.LogCmd != nil && elem.LogCmd.Process != nil {
 				loggerDone <- elem.LogCmd.Process.Kill()
 			}
-			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))
-			startService(srvDone, loggerDone, elem, runningServices, key, value)
+			startService(srvDone, elem, runningServices, key, value)
 		}
 	}
 }
