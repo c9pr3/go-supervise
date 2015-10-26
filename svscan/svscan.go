@@ -1,7 +1,11 @@
+// Go Supervise
+// svscan.go - Service controller code
+//
+// (c) 2015, Christian Senkowski
+
 package main
 
 import (
-	//	"bytes"
 	"bufio"
 	"flag"
 	"fmt"
@@ -28,7 +32,7 @@ func main() {
 		usage(1)
 	}
 
-	servicePath = removeSlashes(servicePath)
+	removeSlashes(servicePath)
 
 	if LOGERR != nil {
 		panic(LOGERR)
@@ -47,21 +51,6 @@ func main() {
 	}
 
 	runningServices := make(map[string]*Service)
-
-	/*
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGINT) //, os.Interrupt)
-		go func() {
-			sig := <-sigs
-			fmt.Printf(fmt.Sprintf("caught signal: %s\n", sig))
-			/*
-				for _, elem := range runningServices {
-					if err := elem.Cmd.Process.Kill(); err != nil {
-						panic(err)
-					}
-				}
-		}()
-	*/
 
 	for {
 		knownServices := getServices()

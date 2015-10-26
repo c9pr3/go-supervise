@@ -1,3 +1,8 @@
+// Go Supervise
+// db.go - etcd DB connection code
+//
+// (c) 2015, Christian Senkowski
+
 package main
 
 import (

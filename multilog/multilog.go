@@ -1,3 +1,8 @@
+// Go Supervise
+// multilogger.go - Logging for svscan
+//
+// (c) 2015, Christian Senkowski
+
 package main
 
 import (
