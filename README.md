@@ -2,7 +2,7 @@
 Proof of concept and playground for a [daemontools](http://cr.yp.to/daemontools.html) written in go.
 The goal is to have a stable service starter which automagically restarts a service if it has been shut down and log (with logrotation) all output.
 
-You may start up with an empty (or not even existing) service-dir and create the services after starting `go-supervise`. As soon as a "run" executable is found, the service be started up.
+You may start up with an empty (or not even existing) service-dir and create the services after starting `go-supervise`. As soon as a "run" executable is found, the service is being started.
 
 You may delete a service sub-directory (e.g. ~/services/srv1) while `go-supervise` is running. It will detect the deletion and shut down the service.
 
@@ -29,8 +29,7 @@ cd go-supervise/svscan
 ```
 
 ## known bugs
-If the multilog process is killed, it will start up again but leave a zombie
-process behind because of open stdin
+See [issues page](https://github.com/Adar/go-supervise/issues)
 
 ## License
 MIT license, see LICENSE.txt for details.
