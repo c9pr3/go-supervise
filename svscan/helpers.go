@@ -66,7 +66,6 @@ func removeServiceAfter(servicesInDir *[]string, key string, elem *Service, srvD
 		LOGGER.Warning(fmt.Sprintf("service %s gone, killing %s\n", key, (*elem).Cmd.Process))
 		err := fmt.Errorf("service %s gone, %s", key, (*elem).Cmd.Process)
 		deleteService(key)
-		//		elem.LogCmd.Process.Kill()
 		srvDone <- elem.Cmd.Process.Kill()
 		return err
 	}

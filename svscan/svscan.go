@@ -101,16 +101,18 @@ func main() {
 	LOGGER.Warning("exiting")
 }
 
-func startLogger(loggerDone chan error, value string, cmd *exec.Cmd, stdout io.ReadCloser) {
+func startLogger(elem *Service, loggerDone chan error, value string, stdout io.ReadCloser) {
+
+	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
 
 	//@TODO rewrite multilog so that it can take stderr and stdout separately
 	stdOutBuff := bufio.NewScanner(stdout)
-	stdin, err := cmd.StdinPipe()
-	defer stdin.Close()
+	stdin, err := elem.LogCmd.StdinPipe()
 	if err != nil {
 		panic(err)
 	}
-	err = cmd.Start()
+	defer stdin.Close()
+	err = elem.LogCmd.Start()
 	if err != nil {
 		panic(err)
 	}
@@ -119,22 +121,19 @@ func startLogger(loggerDone chan error, value string, cmd *exec.Cmd, stdout io.R
 		LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), stdin))
 		_, err := io.WriteString(stdin, stdOutBuff.Text()+"\n")
 		if err != nil {
-			LOGGER.Crit(fmt.Sprintf("IO gone away for %s", value))
-			cmd.Process.Kill()
-			cmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
-			startLogger(loggerDone, value, cmd, stdout)
+			LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", value, elem.LogCmd.Process))
 			break
 		}
 	}
-	loggerDone <- cmd.Wait()
+	loggerDone <- elem.LogCmd.Wait()
 	select {
 	case err := <-loggerDone:
 		if err != nil {
 			LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", value, err))
-			startLogger(loggerDone, value, cmd, stdout)
+			startLogger(elem, loggerDone, value, stdout)
 		} else {
 			LOGGER.Warning(fmt.Sprintf("logger %s interrupted\n", value))
-			startLogger(loggerDone, value, cmd, stdout)
+			startLogger(elem, loggerDone, value, stdout)
 		}
 	}
 }
@@ -146,7 +145,7 @@ func startService(srvDone chan error, loggerDone chan error, elem *Service, runn
 	}
 	LOGGER.Warning(fmt.Sprintf("Starting %s\n", value))
 
-	elem.Cmd = exec.Command("/" + value + "/run") // |& ./../multilog/multilog -path /" + value)
+	elem.Cmd = exec.Command("/" + value + "/run")
 
 	stdout, _ := elem.Cmd.StdoutPipe()
 
@@ -156,8 +155,7 @@ func startService(srvDone chan error, loggerDone chan error, elem *Service, runn
 	}
 	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
 
-	cmd := exec.Command("./../multilog/multilog", "-path", "/"+value)
-	go startLogger(loggerDone, value, cmd, stdout)
+	go startLogger(elem, loggerDone, value, stdout)
 
 	runningServices[key] = elem
 	srvDone <- elem.Cmd.Wait()
@@ -165,8 +163,14 @@ func startService(srvDone chan error, loggerDone chan error, elem *Service, runn
 	case err := <-srvDone:
 		if err != nil {
 			LOGGER.Warning(fmt.Sprintf("process %s done with error = %v\n", key, err))
+			if elem.LogCmd != nil && elem.LogCmd.Process != nil {
+				loggerDone <- elem.LogCmd.Process.Kill()
+			}
 			startService(srvDone, loggerDone, elem, runningServices, key, value)
 		} else {
+			if elem.LogCmd != nil && elem.LogCmd.Process != nil {
+				loggerDone <- elem.LogCmd.Process.Kill()
+			}
 			LOGGER.Warning(fmt.Sprintf("process %s interrupted\n", key))
 			startService(srvDone, loggerDone, elem, runningServices, key, value)
 		}
