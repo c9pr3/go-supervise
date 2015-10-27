@@ -16,10 +16,11 @@ import (
 )
 
 type Service struct {
-	Value   string
-	Cmd     *exec.Cmd
-	LogCmd  *exec.Cmd
-	LogFile *os.File
+	Value     string
+	Cmd       *exec.Cmd
+	LogCmd    *exec.Cmd
+	LogBuffer []string
+	LogFile   *os.File
 }
 
 func deleteService(serviceName string) {

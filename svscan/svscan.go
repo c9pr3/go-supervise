@@ -89,6 +89,12 @@ func main() {
 	LOGGER.Warning("exiting")
 }
 
+func writeLine(elem *Service, stdin io.WriteCloser, line string, value string) error {
+	LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", line, stdin))
+	_, err := io.WriteString(stdin, line+"\n")
+	return err
+}
+
 func startLogger(elem *Service, loggerDone chan error, value string, stdout io.ReadCloser) {
 
 	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+value)
@@ -105,11 +111,24 @@ func startLogger(elem *Service, loggerDone chan error, value string, stdout io.R
 		panic(err)
 	}
 
+	if len(elem.LogBuffer) > 0 {
+		LOGGER.Crit(fmt.Sprintf("found unhandled log lines %s, writing those first", elem.LogBuffer))
+		for _, line := range elem.LogBuffer {
+			err := writeLine(elem, stdin, line, value)
+			if err != nil {
+				LOGGER.Crit(fmt.Sprintf("Could not write buffered log for %s. error: %s", value, err))
+				LOGGER.Crit(fmt.Sprintf("%s - %s", value, line))
+				break
+			}
+		}
+		elem.LogBuffer = nil
+	}
+
 	for stdOutBuff.Scan() {
-		LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", stdOutBuff.Text(), stdin))
-		_, err := io.WriteString(stdin, stdOutBuff.Text()+"\n")
+		err := writeLine(elem, stdin, stdOutBuff.Text(), value)
 		if err != nil {
 			LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", value, elem.LogCmd.Process))
+			elem.LogBuffer = append(elem.LogBuffer, stdOutBuff.Text()+"\n")
 			break
 		}
 	}
