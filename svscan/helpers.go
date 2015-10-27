@@ -96,47 +96,14 @@ func removeServiceAfter(servicesInDir *[]string, key string, elem *Service, srvD
 		LOGGER.Warning(fmt.Sprintf("service %s gone, killing %s\n", key, (*elem).Cmd.Process))
 		err := fmt.Errorf("service %s gone, %s", key, (*elem).Cmd.Process)
 		new(DB).deleteService(key)
-		srvDone <- elem.Cmd.Process.Kill()
+		if elem.Cmd != nil && elem.Cmd.Process != nil {
+			srvDone <- elem.Cmd.Process.Kill()
+		}
 		return err
 	}
 
 	return nil
 }
-
-func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[string]*Service, servicePath *string) {
-	done := make(chan bool)
-	count := 0
-
-	for _, dir := range *servicesInDir {
-		dir := dir
-		if dir == "" {
-			continue
-		}
-
-		_, ok := (*knownServices)[dir]
-
-		if dir == "" || ok == true {
-			continue
-		}
-
-		go func() {
-			LOGGER.Info(fmt.Sprintf("creating new service %s, %s\n", dir, ok))
-			new(DB).createService(dir, *servicePath)
-			srv := new(Service)
-			srv.Value = dir
-			(*knownServices)[dir] = srv
-			count++
-			done <- true
-		}()
-	}
-
-	if count > 0 {
-		for i := 0; i <= count; i++ {
-			<-done
-		}
-	}
-}
-
 func getHostName() string {
 	hostName, err := os.Hostname()
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"log/syslog"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -24,6 +25,8 @@ const (
 )
 
 type ServiceHandler struct {
+	mutex   *sync.Mutex
+	service *Service
 }
 
 /**
@@ -68,14 +71,13 @@ func main() {
 	 * If differ, decide which to remove or add
 	 */
 	for {
-		knownServices := db.getServices()
 		servicesInDir := readServiceDir(servicePath)
-		createNewServicesIfNeeded(&servicesInDir, &knownServices, servicePath)
+		db.createNewServicesIfNeeded(&servicesInDir, servicePath)
+		knownServices := db.getServices()
 
-		for serviceName, elem := range knownServices {
+		for serviceName, service := range knownServices {
 			serviceName := serviceName
-			elem := elem
-			serviceDir := string(elem.Value)
+			service := service
 
 			srvDone := make(chan error, 1)
 
@@ -86,7 +88,10 @@ func main() {
 					if err == nil {
 						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", serviceName))
 						time.Sleep(1 * time.Second)
-						new(ServiceHandler).startService(srvDone, elem, runningServices, serviceName, serviceDir)
+						sv := new(ServiceHandler)
+						sv.mutex = &sync.Mutex{}
+						sv.service = service
+						sv.startService(srvDone, runningServices, serviceName)
 					}
 				}()
 			} else {
@@ -105,109 +110,127 @@ func main() {
 	LOGGER.Warning("exiting")
 }
 
-func (s *ServiceHandler) writeLine(elem *Service, stdin io.WriteCloser, line string, serviceDir string) error {
+func (s *ServiceHandler) writeLine(stdin io.WriteCloser, line string) error {
 	LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", line, stdin))
 	_, err := io.WriteString(stdin, line+"\n")
 	return err
 }
 
-func (s *ServiceHandler) startLogger(elem *Service, loggerDone chan error, serviceDir string, stdout io.ReadCloser) {
-	if elem.Startups >= MAX_SERVICE_STARTUPS {
-		if len(elem.LogBuffer) > 0 {
+func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser) {
+	if s.service.Startups >= MAX_SERVICE_STARTUPS {
+		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", s.service.Value))
+		if len(s.service.LogBuffer) > 0 {
+			LOGGER.Crit(fmt.Sprintf("%s - %s", s.service.Value, s.service.LogBuffer))
+			s.service.LogBuffer = nil
 		}
-		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", serviceDir))
 		return
 	}
 
-	elem.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+serviceDir)
+	s.mutex.Lock()
+	s.service.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+s.service.Value)
 
 	//@TODO rewrite multilog so that it can take stderr and stdout separately
 	stdOutBuff := bufio.NewScanner(stdout)
-	stdin, err := elem.LogCmd.StdinPipe()
+	stdin, err := s.service.LogCmd.StdinPipe()
 	if err != nil {
-		panic(err)
+		LOGGER.Crit(fmt.Sprintf("Error while catching stdinpipe of %s, %s", s.service.Value, err))
+		s.mutex.Unlock()
+		return
 	}
 	defer stdin.Close()
-	err = elem.LogCmd.Start()
+	err = s.service.LogCmd.Start()
 	if err != nil {
-		panic(err)
+		LOGGER.Crit(fmt.Sprintf("Error while starting logger %s", err))
+		s.mutex.Unlock()
+		return
 	}
+	s.mutex.Unlock()
 
-	if len(elem.LogBuffer) > 0 {
-		LOGGER.Crit(fmt.Sprintf("found unhandled log lines for %s, writing those first", serviceDir))
-		for _, line := range elem.LogBuffer {
-			err := s.writeLine(elem, stdin, line, serviceDir)
+	if len(s.service.LogBuffer) > 0 {
+		LOGGER.Crit(fmt.Sprintf("found unhandled log lines for %s, writing those first", s.service.Value))
+		for _, line := range s.service.LogBuffer {
+			err := s.writeLine(stdin, line)
 			if err != nil {
-				LOGGER.Crit(fmt.Sprintf("Could not write buffered log for %s. error: %s", serviceDir, err))
-				LOGGER.Crit(fmt.Sprintf("%s - %s", serviceDir, line))
+				LOGGER.Crit(fmt.Sprintf("Could not write buffered log for %s. error: %s", s.service.Value, err))
+				LOGGER.Crit(fmt.Sprintf("%s - %s", s.service.Value, line))
 				break
 			}
 		}
-		elem.LogBuffer = nil
+		s.service.LogBuffer = nil
 	}
 
 	for stdOutBuff.Scan() {
-		err := s.writeLine(elem, stdin, stdOutBuff.Text(), serviceDir)
+		err := s.writeLine(stdin, stdOutBuff.Text())
 		if err != nil {
-			LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", serviceDir, elem.LogCmd.Process))
-			elem.LogBuffer = append(elem.LogBuffer, stdOutBuff.Text()+"\n")
+			LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", s.service.Value, s.service.LogCmd.Process))
+			s.service.LogBuffer = append(s.service.LogBuffer, stdOutBuff.Text()+"\n")
 			break
 		}
 	}
-	loggerDone <- elem.LogCmd.Wait()
+	loggerDone <- s.service.LogCmd.Wait()
 	select {
 	case <-loggerDone:
-		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", serviceDir))
-		if len(elem.LogBuffer) > 0 {
-			s.startLogger(elem, loggerDone, serviceDir, stdout)
+		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", s.service.Value))
+		if len(s.service.LogBuffer) > 0 {
+			s.startLogger(loggerDone, stdout)
 		}
 		break
 	case err := <-loggerDone:
-		LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", serviceDir, err))
-		s.startLogger(elem, loggerDone, serviceDir, stdout)
+		LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", s.service.Value, err))
+		s.startLogger(loggerDone, stdout)
 	}
 }
 
-func (s *ServiceHandler) startService(srvDone chan error, elem *Service, runningServices map[string]*Service, serviceName string, serviceDir string) {
-	if elem.Startups >= MAX_SERVICE_STARTUPS {
+func (s *ServiceHandler) startService(srvDone chan error, runningServices map[string]*Service, serviceName string) {
+	if s.service.Startups >= MAX_SERVICE_STARTUPS {
 		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", serviceName))
 		return
 	}
 	loggerDone := make(chan error, 1)
+	s.mutex.Lock()
 	knownServices := new(DB).getServices()
+	s.mutex.Unlock()
 	if _, ok := knownServices[serviceName]; ok != true {
 		return
 	}
-	LOGGER.Warning(fmt.Sprintf("Starting %s\n", serviceDir))
+	LOGGER.Warning(fmt.Sprintf("Starting %s\n", s.service.Value))
 
-	elem.Cmd = exec.Command("/" + serviceDir + "/run")
+	s.service.Cmd = exec.Command("/" + s.service.Value + "/run")
 
-	stdout, _ := elem.Cmd.StdoutPipe()
+	stdout, _ := s.service.Cmd.StdoutPipe()
 
-	elem.Startups += 1
-	if err := elem.Cmd.Start(); err != nil {
+	s.service.Startups += 1
+	if err := s.service.Cmd.Start(); err != nil {
 		LOGGER.Crit(fmt.Sprintf("service %s not startable: %s", serviceName, err))
 		return
 	}
-	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
+	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", s.service.Cmd.Process, s.service.Value))
 
-	go s.startLogger(elem, loggerDone, serviceDir, stdout)
+	// this is double critical and needs a review.
+	// If the service fails before the logger started up
+	// this might result in unexpected behaviour.
+	// The mutex PLUS wait fixes it with <= 100 services failing
+	// but everything beyond results in a crash
+	//s.mutex.Lock()
+	go s.startLogger(loggerDone, stdout)
+	/*
+		for s.service.LogCmd == nil || s.service.LogCmd.Process == nil {
+			LOGGER.Warning(fmt.Sprintf("service %s, waiting for logger to come up", serviceName))
+			time.Sleep(1 * time.Second)
+		}
+	*/
+	//s.mutex.Unlock()
 
-	for elem.LogCmd == nil || elem.LogCmd.Process == nil {
-		LOGGER.Warning(fmt.Sprintf("service %s, waiting for logger to come up", serviceName))
-		time.Sleep(1 * time.Second)
-	}
-
-	runningServices[serviceName] = elem
-	srvDone <- elem.Cmd.Wait()
+	runningServices[serviceName] = s.service
+	srvDone <- s.service.Cmd.Wait()
 	select {
 	case err := <-srvDone:
 		LOGGER.Warning(fmt.Sprintf("restarting service %s, %s", serviceName, err))
-		if elem.LogCmd != nil && elem.LogCmd.Process != nil {
-			loggerDone <- elem.LogCmd.Process.Kill()
+		if s.service.LogCmd != nil && s.service.LogCmd.Process != nil {
+			loggerDone <- s.service.LogCmd.Process.Kill()
 		}
 		time.Sleep(1 * time.Second)
-		s.startService(srvDone, elem, runningServices, serviceName, serviceDir)
+		s.startService(srvDone, runningServices, serviceName)
 	}
 }
 

@@ -51,6 +51,42 @@ func (d *DB) createService(serviceName string, servicePath string) {
 	d.getClient().Create(context.Background(), "supervise/"+getHostName()+"/"+serviceName, servicePath+"/"+serviceName)
 }
 
+func (d *DB) createNewServicesIfNeeded(servicesInDir *[]string, servicePath *string) {
+	done := make(chan bool)
+	count := 0
+
+	knownServices := d.getServices()
+
+	for _, dir := range *servicesInDir {
+		dir := dir
+		if dir == "" {
+			continue
+		}
+
+		_, ok := knownServices[dir]
+
+		if dir == "" || ok == true {
+			continue
+		}
+
+		go func() {
+			LOGGER.Info(fmt.Sprintf("creating new service %s, %s\n", dir, ok))
+			d.createService(dir, *servicePath)
+			srv := new(Service)
+			srv.Value = dir
+			knownServices[dir] = srv
+			count++
+			done <- true
+		}()
+	}
+
+	if count > 0 {
+		for i := 0; i <= count; i++ {
+			<-done
+		}
+	}
+}
+
 /**
  * Get all services from DB
  *
@@ -61,7 +97,8 @@ func (d *DB) getServices() map[string]*Service {
 
 	client, err := d.getClient().Get(context.Background(), "supervise/"+getHostName(), nil)
 	if err != nil {
-		panic(err)
+		LOGGER.Crit(fmt.Sprintf("Error while getting DB client %s", err))
+		return nil
 	}
 	values := client.Node.Nodes
 	if values != nil {
