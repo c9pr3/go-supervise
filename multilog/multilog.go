@@ -45,27 +45,25 @@ func main() {
 		1,     // maximum size of a logfile in MB
 		false) // whether logs with Trace level are written down
 
-	for {
-		info, _ := os.Stdin.Stat()
+	info, _ := os.Stdin.Stat()
 
-		if (info.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
-			// no input
-		} else if info.Size() > 0 {
-			reader := bufio.NewReader(os.Stdin)
-			for {
-				input, err := reader.ReadString('\n')
-				if err != nil && err == io.EOF {
-					LOGGER.Crit(fmt.Sprintf("input read error %s", err))
-					break
-				}
-				// remove trailing newline
-				input = input[0 : len(input)-1]
-
-				timeStamp := tai64n.Now().Label()
-
-				LOGGER.Crit(fmt.Sprintf("input received %s", input))
-				logger.Info("%s %s", timeStamp, input)
+	if (info.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
+		// no input
+	} else if info.Size() > 0 {
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			input, err := reader.ReadString('\n')
+			if err != nil && err == io.EOF {
+				LOGGER.Crit(fmt.Sprintf("input read error %s", err))
+				break
 			}
+			// remove trailing newline
+			input = input[0 : len(input)-1]
+
+			timeStamp := tai64n.Now().Label()
+
+			LOGGER.Crit(fmt.Sprintf("input received %s", input))
+			logger.Info("%s %s", timeStamp, input)
 		}
 	}
 

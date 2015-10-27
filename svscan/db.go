@@ -21,6 +21,7 @@ type Service struct {
 	LogCmd    *exec.Cmd
 	LogBuffer []string
 	LogFile   *os.File
+	Startups  int
 }
 
 func deleteService(serviceName string) {
