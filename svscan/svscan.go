@@ -19,9 +19,12 @@ import (
 var LOGGER, LOGERR = syslog.New(syslog.LOG_WARNING, "svscan")
 
 const (
-	VERSION              = "0.1"
+	VERSION              = "0.3"
 	MAX_SERVICE_STARTUPS = 5
 )
+
+type ServiceHandler struct {
+}
 
 /**
  * Main
@@ -45,7 +48,8 @@ func main() {
 		panic(LOGERR)
 	}
 
-	getClient()
+	db := new(DB)
+	db.getClient()
 
 	LOGGER.Warning(fmt.Sprintf("Scanning %s\n", *servicePath))
 
@@ -64,7 +68,7 @@ func main() {
 	 * If differ, decide which to remove or add
 	 */
 	for {
-		knownServices := getServices()
+		knownServices := db.getServices()
 		servicesInDir := readServiceDir(servicePath)
 		createNewServicesIfNeeded(&servicesInDir, &knownServices, servicePath)
 
@@ -82,7 +86,7 @@ func main() {
 					if err == nil {
 						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", serviceName))
 						time.Sleep(1 * time.Second)
-						startService(srvDone, elem, runningServices, serviceName, serviceDir)
+						new(ServiceHandler).startService(srvDone, elem, runningServices, serviceName, serviceDir)
 					}
 				}()
 			} else {
@@ -101,13 +105,13 @@ func main() {
 	LOGGER.Warning("exiting")
 }
 
-func writeLine(elem *Service, stdin io.WriteCloser, line string, serviceDir string) error {
+func (s *ServiceHandler) writeLine(elem *Service, stdin io.WriteCloser, line string, serviceDir string) error {
 	LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", line, stdin))
 	_, err := io.WriteString(stdin, line+"\n")
 	return err
 }
 
-func startLogger(elem *Service, loggerDone chan error, serviceDir string, stdout io.ReadCloser) {
+func (s *ServiceHandler) startLogger(elem *Service, loggerDone chan error, serviceDir string, stdout io.ReadCloser) {
 	if elem.Startups >= MAX_SERVICE_STARTUPS {
 		if len(elem.LogBuffer) > 0 {
 		}
@@ -132,7 +136,7 @@ func startLogger(elem *Service, loggerDone chan error, serviceDir string, stdout
 	if len(elem.LogBuffer) > 0 {
 		LOGGER.Crit(fmt.Sprintf("found unhandled log lines for %s, writing those first", serviceDir))
 		for _, line := range elem.LogBuffer {
-			err := writeLine(elem, stdin, line, serviceDir)
+			err := s.writeLine(elem, stdin, line, serviceDir)
 			if err != nil {
 				LOGGER.Crit(fmt.Sprintf("Could not write buffered log for %s. error: %s", serviceDir, err))
 				LOGGER.Crit(fmt.Sprintf("%s - %s", serviceDir, line))
@@ -143,7 +147,7 @@ func startLogger(elem *Service, loggerDone chan error, serviceDir string, stdout
 	}
 
 	for stdOutBuff.Scan() {
-		err := writeLine(elem, stdin, stdOutBuff.Text(), serviceDir)
+		err := s.writeLine(elem, stdin, stdOutBuff.Text(), serviceDir)
 		if err != nil {
 			LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", serviceDir, elem.LogCmd.Process))
 			elem.LogBuffer = append(elem.LogBuffer, stdOutBuff.Text()+"\n")
@@ -155,22 +159,22 @@ func startLogger(elem *Service, loggerDone chan error, serviceDir string, stdout
 	case <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", serviceDir))
 		if len(elem.LogBuffer) > 0 {
-			startLogger(elem, loggerDone, serviceDir, stdout)
+			s.startLogger(elem, loggerDone, serviceDir, stdout)
 		}
 		break
 	case err := <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", serviceDir, err))
-		startLogger(elem, loggerDone, serviceDir, stdout)
+		s.startLogger(elem, loggerDone, serviceDir, stdout)
 	}
 }
 
-func startService(srvDone chan error, elem *Service, runningServices map[string]*Service, serviceName string, serviceDir string) {
+func (s *ServiceHandler) startService(srvDone chan error, elem *Service, runningServices map[string]*Service, serviceName string, serviceDir string) {
 	if elem.Startups >= MAX_SERVICE_STARTUPS {
 		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", serviceName))
 		return
 	}
 	loggerDone := make(chan error, 1)
-	knownServices := getServices()
+	knownServices := new(DB).getServices()
 	if _, ok := knownServices[serviceName]; ok != true {
 		return
 	}
@@ -187,7 +191,7 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 	}
 	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", elem.Cmd.Process, elem.Value))
 
-	go startLogger(elem, loggerDone, serviceDir, stdout)
+	go s.startLogger(elem, loggerDone, serviceDir, stdout)
 
 	for elem.LogCmd == nil || elem.LogCmd.Process == nil {
 		LOGGER.Warning(fmt.Sprintf("service %s, waiting for logger to come up", serviceName))
@@ -203,7 +207,7 @@ func startService(srvDone chan error, elem *Service, runningServices map[string]
 			loggerDone <- elem.LogCmd.Process.Kill()
 		}
 		time.Sleep(1 * time.Second)
-		startService(srvDone, elem, runningServices, serviceName, serviceDir)
+		s.startService(srvDone, elem, runningServices, serviceName, serviceDir)
 	}
 }
 

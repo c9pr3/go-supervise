@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+type DB struct {
+}
+
+/**
+ * One Service
+ */
 type Service struct {
 	Value     string
 	Cmd       *exec.Cmd
@@ -24,20 +30,36 @@ type Service struct {
 	Startups  int
 }
 
-func deleteService(serviceName string) {
+/**
+ * Delete a service from DB
+ *
+ * @param string serviceName
+ */
+func (d *DB) deleteService(serviceName string) {
 	LOGGER.Debug(fmt.Sprintf("removing service %s\n", serviceName))
-	getClient().Delete(context.Background(), "supervise/"+getHostName()+"/"+serviceName, nil)
+	d.getClient().Delete(context.Background(), "supervise/"+getHostName()+"/"+serviceName, nil)
 }
 
-func createService(serviceName string, servicePath string) {
+/**
+ * Create a service in DB
+ *
+ * @param string serviceName
+ * @param string servicePath
+ */
+func (d *DB) createService(serviceName string, servicePath string) {
 	LOGGER.Debug(fmt.Sprintf("createServiceInDb - %s\n", serviceName))
-	getClient().Create(context.Background(), "supervise/"+getHostName()+"/"+serviceName, servicePath+"/"+serviceName)
+	d.getClient().Create(context.Background(), "supervise/"+getHostName()+"/"+serviceName, servicePath+"/"+serviceName)
 }
 
-func getServices() map[string]*Service {
+/**
+ * Get all services from DB
+ *
+ * @return map[string ]*Service
+ */
+func (d *DB) getServices() map[string]*Service {
 	services := make(map[string]*Service)
 
-	client, err := getClient().Get(context.Background(), "supervise/"+getHostName(), nil)
+	client, err := d.getClient().Get(context.Background(), "supervise/"+getHostName(), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +75,12 @@ func getServices() map[string]*Service {
 	return services
 }
 
-func getClient() client.KeysAPI {
+/**
+ * Get client
+ *
+ * @return client.KeysAPI
+ */
+func (d *DB) getClient() client.KeysAPI {
 	cfg := client.Config{
 		Endpoints:               []string{"http://127.0.0.1:2379"},
 		Transport:               client.DefaultTransport,

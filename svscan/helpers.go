@@ -67,7 +67,7 @@ func removeServiceBefore(servicesInDir *[]string, key string) error {
 
 	if !found {
 		LOGGER.Debug(fmt.Sprintf("Before: Did not find %s, %s\n", key))
-		deleteService(key)
+		new(DB).deleteService(key)
 		err := fmt.Errorf("Before: Invalid service %s, %s", key)
 		return err
 	}
@@ -95,7 +95,7 @@ func removeServiceAfter(servicesInDir *[]string, key string, elem *Service, srvD
 	if !found {
 		LOGGER.Warning(fmt.Sprintf("service %s gone, killing %s\n", key, (*elem).Cmd.Process))
 		err := fmt.Errorf("service %s gone, %s", key, (*elem).Cmd.Process)
-		deleteService(key)
+		new(DB).deleteService(key)
 		srvDone <- elem.Cmd.Process.Kill()
 		return err
 	}
@@ -121,7 +121,7 @@ func createNewServicesIfNeeded(servicesInDir *[]string, knownServices *map[strin
 
 		go func() {
 			LOGGER.Info(fmt.Sprintf("creating new service %s, %s\n", dir, ok))
-			createService(dir, *servicePath)
+			new(DB).createService(dir, *servicePath)
 			srv := new(Service)
 			srv.Value = dir
 			(*knownServices)[dir] = srv

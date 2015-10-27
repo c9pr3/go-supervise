@@ -2,6 +2,9 @@
 // multilogger.go - Logging for svscan
 //
 // (c) 2015, Christian Senkowski
+//
+// @TODO
+// - Make configurable
 
 package main
 
@@ -19,9 +22,12 @@ import (
 var LOGGER, LOGERR = syslog.New(syslog.LOG_WARNING, "svscan")
 
 const (
-	VERSION = "0.1"
+	VERSION = "0.3"
 )
 
+/**
+ * Receives lines and log(rotates) them away
+ */
 func main() {
 
 	servicePath := flag.String("path", "", "service path")
@@ -29,7 +35,7 @@ func main() {
 	if LOGERR != nil {
 		panic(LOGERR)
 	}
-	LOGGER.Warning("multilog starting up " + *servicePath)
+	LOGGER.Debug("multilog starting up " + *servicePath)
 
 	if len(flag.Args()) != 0 {
 		LOGGER.Crit("not enough arguments")
@@ -37,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	servicePath = removeSlashes(servicePath)
+	removeSlashes(servicePath)
 
 	logger.Init("/"+*servicePath+"/log",
 		50,    // maximum logfiles allowed under the specified log directory
@@ -62,24 +68,27 @@ func main() {
 
 			timeStamp := tai64n.Now().Label()
 
-			LOGGER.Crit(fmt.Sprintf("input received %s", input))
+			LOGGER.Debug(fmt.Sprintf("input received %s", input))
 			logger.Info("%s %s", timeStamp, input)
 		}
 	}
 
-	LOGGER.Crit("multilog shutting down\n")
+	LOGGER.Debug("multilog shutting down\n")
 }
 
-func removeSlashes(s *string) *string {
-	p := *s
+/**
+ * Remove slashes
+ *
+ * @param *string str with possible leading and trailing slashes
+ */
+func removeSlashes(s *string) {
 	for {
-		if p[len(p)-1:len(p)] == "/" {
-			p = p[0 : len(p)-1]
-		} else if p[0:1] == "/" {
-			p = p[1:len(p)]
+		if os.IsPathSeparator(((*s)[len(*s)-1 : len(*s)])[0]) {
+			*s = (*s)[0 : len(*s)-1]
+		} else if os.IsPathSeparator(((*s)[0:1])[0]) {
+			*s = (*s)[1:len(*s)]
 		} else {
 			break
 		}
 	}
-	return &p
 }
