@@ -46,9 +46,9 @@ func main() {
 	removeSlashes(servicePath)
 
 	logger.Init("/"+*servicePath+"/log",
-		50,    // maximum logfiles allowed under the specified log directory
-		20,    // number of logfiles to delete when number of logfiles exceeds the configured limit
-		1,     // maximum size of a logfile in MB
+		10,    // maximum logfiles allowed under the specified log directory
+		5,     // number of logfiles to delete when number of logfiles exceeds the configured limit
+		25,    // maximum size of a logfile in MB
 		false) // whether logs with Trace level are written down
 
 	info, _ := os.Stdin.Stat()
@@ -65,6 +65,9 @@ func main() {
 			}
 			// remove trailing newline
 			input = input[0 : len(input)-1]
+			if len(input) <= 0 || input == "\n" {
+				continue
+			}
 
 			timeStamp := tai64n.Now().Label()
 
