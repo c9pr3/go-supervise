@@ -55,7 +55,7 @@ func main() {
 
 	if (info.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 		// no input
-	} else if info.Size() > 0 {
+	} else {
 		reader := bufio.NewReader(os.Stdin)
 		for {
 			input, err := reader.ReadString('\n')
@@ -82,6 +82,9 @@ func main() {
  * @param *string str with possible leading and trailing slashes
  */
 func removeSlashes(s *string) {
+	if len(*s) <= 1 {
+		return
+	}
 	for {
 		if os.IsPathSeparator(((*s)[len(*s)-1 : len(*s)])[0]) {
 			*s = (*s)[0 : len(*s)-1]
