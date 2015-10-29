@@ -18,15 +18,24 @@ Not existent yet, Sorry :-)
 ## uses
 Antigloss' [Logger](http://github.com/antigloss/go)
 CoreOS [etcd client](http://github.com/coreos/etcd)
-Vektra's [TAI64](http://github.com/vektra/tai64n)
+Vektra's [TAI64n](http://github.com/vektra/tai64n)
 
 ## usage
+(Please make sure, GOPATH is set and etcd is running)
 ```
-mkdir ~/services/srv1 && echo "echo \"starting up\" ; sleep 1000" > ~/services/srv1/run
+mkdir -p ~/services/srv1 && echo "echo \"starting up\" ; sleep 1000" > ~/services/srv1/run && chmod 755 ~/services/srv1/run
 git clone https://github.com/Adar/go-supervise
+go get github.com/coreos/etcd github.com/antigloss/go/logger github.com/vektra/tai64n
 cd go-supervise/svscan
-./svscan -path ~/services/
+./run.sh & tail -f /var/log/syslog 
+# where syslog might be /var/log/messages in CentOS
 ```
+(If you see
+"Error while getting DB client client: etcd cluster is unavailable or
+misconfigured" in your syslog, etcd is not running correctly.)
+
+
+
 
 ## known bugs
 See [issues page](https://github.com/Adar/go-supervise/issues)
