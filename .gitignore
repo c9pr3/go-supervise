@@ -2,6 +2,8 @@
 
 supervise/supervise
 svscan/svscan
+multilog/multilog
+svc/svc
 
 ### Go ###
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
