@@ -1,0 +1,18 @@
+{
+    "ServiceConfig" : {
+        "path": "/Users/chris/services/",
+        "max_failed_startups": 50,
+        "time_between_startups": 1
+    },
+    "LogConfig" : {
+        "level": "DEBUG",
+        "log_empty": false,
+        "log_syslog": true,
+        "tai64": true
+    },
+    "LogFilesConfig": {
+        "max": 10,
+        "delete": 5,
+        "size": 25
+    }
+}

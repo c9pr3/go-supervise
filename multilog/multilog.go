@@ -3,8 +3,6 @@
 //
 // (c) 2015, Christian Senkowski
 //
-// @TODO
-// - Make configurable
 
 package main
 
@@ -12,14 +10,17 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/adar/go-supervise/config"
 	"github.com/antigloss/go/logger"
 	"github.com/vektra/tai64n"
 	"io"
 	"log/syslog"
 	"os"
+	"time"
 )
 
 var LOGGER, LOGERR = syslog.New(syslog.LOG_WARNING, "svscan")
+var CONFIG, CONFERR = config.ReadConfig()
 
 const (
 	VERSION = "0.3"
@@ -35,10 +36,15 @@ func main() {
 	if LOGERR != nil {
 		panic(LOGERR)
 	}
-	LOGGER.Debug("multilog starting up " + *servicePath)
+
+	if CONFIG.LogConfig.LogSyslog {
+		LOGGER.Debug("multilog starting up " + *servicePath)
+	}
 
 	if len(flag.Args()) != 0 {
-		LOGGER.Crit("not enough arguments")
+		if CONFIG.LogConfig.LogSyslog {
+			LOGGER.Crit("not enough arguments")
+		}
 		fmt.Printf("not enough arguments - %s\n", *servicePath)
 		os.Exit(1)
 	}
@@ -46,10 +52,14 @@ func main() {
 	removeSlashes(servicePath)
 
 	logger.Init("/"+*servicePath+"/log",
-		10,    // maximum logfiles allowed under the specified log directory
-		5,     // number of logfiles to delete when number of logfiles exceeds the configured limit
-		25,    // maximum size of a logfile in MB
-		false) // whether logs with Trace level are written down
+		// maximum logfiles allowed under the specified log directory
+		CONFIG.LogFilesConfig.MaxFiles,
+		// number of logfiles to delete when number of logfiles exceeds the configured limit
+		CONFIG.LogFilesConfig.DeleteFiles,
+		// maximum size of a logfile in MB
+		CONFIG.LogFilesConfig.MaxFileSize,
+		// whether logs with Trace level are written down
+		false)
 
 	info, _ := os.Stdin.Stat()
 
@@ -60,23 +70,36 @@ func main() {
 		for {
 			input, err := reader.ReadString('\n')
 			if err != nil && err == io.EOF {
-				LOGGER.Crit(fmt.Sprintf("input read error %s", err))
+				if CONFIG.LogConfig.LogSyslog {
+					LOGGER.Crit(fmt.Sprintf("input read error %s", err))
+				}
 				break
 			}
 			// remove trailing newline
 			input = input[0 : len(input)-1]
-			if len(input) <= 0 || input == "\n" {
-				continue
+
+			//log empty?
+			if !CONFIG.LogConfig.LogEmpty {
+				if len(input) <= 0 || input == "\n" {
+					continue
+				}
 			}
 
-			timeStamp := tai64n.Now().Label()
+			timeStamp := time.Now().UTC().Format(time.UnixDate)
+			if CONFIG.LogConfig.Tai64 {
+				timeStamp = tai64n.Now().Label()
+			}
 
-			LOGGER.Debug(fmt.Sprintf("input received %s", input))
+			if CONFIG.LogConfig.LogSyslog {
+				LOGGER.Debug(fmt.Sprintf("input received %s", input))
+			}
 			logger.Info("%s %s", timeStamp, input)
 		}
 	}
 
-	LOGGER.Debug("multilog shutting down\n")
+	if CONFIG.LogConfig.LogSyslog {
+		LOGGER.Debug("multilog shutting down\n")
+	}
 }
 
 /**

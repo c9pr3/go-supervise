@@ -7,8 +7,8 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
+	"github.com/adar/go-supervise/config"
 	"io"
 	"log/syslog"
 	"os"
@@ -18,6 +18,7 @@ import (
 )
 
 var LOGGER, LOGERR = syslog.New(syslog.LOG_WARNING, "svscan")
+var CONFIG, CONFERR = config.ReadConfig()
 
 const (
 	VERSION              = "0.3"
@@ -29,27 +30,28 @@ type ServiceHandler struct {
 	service *Service
 }
 
+func main() {
+	if CONFERR != nil {
+		fmt.Printf("Error while reading config ", CONFERR)
+	} else {
+		start()
+	}
+}
+
 /**
- * Main
+ * Start
  * Loops through list of services in etcd database
  * and on defined path, resorts those and starts/restarts the services
  * which are still active.
  */
-func main() {
-
-	servicePath := flag.String("path", "", "service path")
-	flag.Parse()
-
-	if len(flag.Args()) != 0 {
-		fmt.Printf("not enough arguments - %s\n", *servicePath)
-		usage(1)
-	}
-
-	removeSlashes(servicePath)
+func start() {
 
 	if LOGERR != nil {
 		panic(LOGERR)
 	}
+
+	servicePath := &CONFIG.ServiceConfig.Path
+	removeSlashes(servicePath)
 
 	db := new(DB)
 	db.getClient()
@@ -66,10 +68,8 @@ func main() {
 
 	runningServices := make(map[string]*Service)
 
-	/**
-	 * Loop knownServices and services in directory
-	 * If differ, decide which to remove or add
-	 */
+	// Loop knownServices and services in directory
+	// If differ, decide which to remove or add
 	for {
 		servicesInDir := readServiceDir(servicePath)
 		db.createNewServicesIfNeeded(&servicesInDir, servicePath)
@@ -182,7 +182,7 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 }
 
 func (s *ServiceHandler) startService(srvDone chan error, runningServices map[string]*Service, serviceName string) {
-	if s.service.Startups >= MAX_SERVICE_STARTUPS {
+	if s.service.Startups >= CONFIG.ServiceConfig.MaxFailedStartups {
 		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", serviceName))
 		return
 	}
@@ -206,20 +206,7 @@ func (s *ServiceHandler) startService(srvDone chan error, runningServices map[st
 	}
 	LOGGER.Debug(fmt.Sprintf("Starting %s, %s\n", s.service.Cmd.Process, s.service.Value))
 
-	// this is double critical and needs a review.
-	// If the service fails before the logger started up
-	// this might result in unexpected behaviour.
-	// The mutex PLUS wait fixes it with <= 100 services failing
-	// but everything beyond results in a crash
-	//s.mutex.Lock()
 	go s.startLogger(loggerDone, stdout)
-	/*
-		for s.service.LogCmd == nil || s.service.LogCmd.Process == nil {
-			LOGGER.Warning(fmt.Sprintf("service %s, waiting for logger to come up", serviceName))
-			time.Sleep(1 * time.Second)
-		}
-	*/
-	//s.mutex.Unlock()
 
 	runningServices[serviceName] = s.service
 	srvDone <- s.service.Cmd.Wait()
@@ -229,7 +216,7 @@ func (s *ServiceHandler) startService(srvDone chan error, runningServices map[st
 		if s.service.LogCmd != nil && s.service.LogCmd.Process != nil {
 			loggerDone <- s.service.LogCmd.Process.Kill()
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Duration(CONFIG.ServiceConfig.TimeWaitBetweenStartups) * time.Second)
 		s.startService(srvDone, runningServices, serviceName)
 	}
 }
