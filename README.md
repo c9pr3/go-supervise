@@ -24,18 +24,18 @@ Vektra's [TAI64n](http://github.com/vektra/tai64n)
 (Please make sure, GOPATH is set and etcd is running)
 ```
 mkdir -p ~/services/srv1 && echo "echo \"starting up\" ; sleep 1000" > ~/services/srv1/run && chmod 755 ~/services/srv1/run
-git clone https://github.com/Adar/go-supervise
-go get github.com/coreos/etcd github.com/antigloss/go/logger github.com/vektra/tai64n
-cd go-supervise/svscan
-./run.sh & tail -f /var/log/syslog 
+go get github.com/adar/go-supervise
+# it will claim that there are no buildable go-files - ignore
+
+# change service-path (edit config.json - ServiceConfig/path
+cd $GOPATH/src/github.com/adar/go-supervise/config
+vi config.json
+
+cd ../svscan && ./run.sh & tail -f /var/log/syslog 
 # where syslog might be /var/log/messages in CentOS
 ```
-(If you see
-"Error while getting DB client client: etcd cluster is unavailable or
+(If you see "Error while getting DB client client: etcd cluster is unavailable or
 misconfigured" in your syslog, etcd is not running correctly.)
-
-
-
 
 ## known bugs
 See [issues page](https://github.com/Adar/go-supervise/issues)
