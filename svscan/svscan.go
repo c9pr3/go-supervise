@@ -159,15 +159,19 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 		s.service.LogBuffer = nil
 	}
 
-	for stdOutBuff.Scan() {
-		err := s.writeLine(stdin, stdOutBuff.Text())
-		if err != nil {
-			LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", s.service.Value, s.service.LogCmd.Process))
-			s.service.LogBuffer = append(s.service.LogBuffer, stdOutBuff.Text()+"\n")
-			break
+	go func() {
+		for stdOutBuff.Scan() {
+			err := s.writeLine(stdin, stdOutBuff.Text())
+			if err != nil {
+				LOGGER.Crit(fmt.Sprintf("IO gone away for %s, %s", s.service.Value, s.service.LogCmd.Process))
+				s.service.LogBuffer = append(s.service.LogBuffer, stdOutBuff.Text()+"\n")
+				break
+			}
 		}
-	}
+	}()
+
 	loggerDone <- s.service.LogCmd.Wait()
+
 	select {
 	case <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", s.service.Value))
