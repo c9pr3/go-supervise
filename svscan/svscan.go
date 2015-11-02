@@ -167,7 +167,9 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 			break
 		}
 	}
+
 	loggerDone <- s.service.LogCmd.Wait()
+
 	select {
 	case <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", s.service.Value))
