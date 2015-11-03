@@ -122,8 +122,8 @@ func (s *ServiceHandler) writeLine(stdin io.WriteCloser, line string) error {
 }
 
 func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser) {
-	if s.service.Startups >= MAX_SERVICE_STARTUPS {
-		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", s.service.Value))
+	if s.service.Startups >= MAX_SERVICE_STARTUPS*2 {
+		LOGGER.Crit(fmt.Sprintf("logger %s has had too many startups in this session", s.service.Value))
 		if len(s.service.LogBuffer) > 0 {
 			LOGGER.Crit(fmt.Sprintf("%s - %s", s.service.Value, s.service.LogBuffer))
 			s.service.LogBuffer = nil
