@@ -191,12 +191,12 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 	case <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", s.service.Value))
 		if len(s.service.LogBuffer) > 0 {
-			//s.startLogger(loggerDone, stdout)
+			s.startLogger(loggerDone, stdout)
 		}
 		break
 	case err := <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", s.service.Value, err))
-		//s.startLogger(loggerDone, stdout)
+		s.startLogger(loggerDone, stdout)
 		break
 	}
 }
