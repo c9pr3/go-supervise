@@ -115,22 +115,34 @@ func start() {
 	LOGGER.Warning("exiting")
 }
 
+/**
+ * Write a line
+ *
+ * @param io.WriteCloser
+ * @param string
+ */
 func (s *ServiceHandler) writeLine(stdin io.WriteCloser, line string) error {
 	LOGGER.Debug(fmt.Sprintf("writing \"%s\" to stdin, %s\n", line, stdin))
 	_, err := io.WriteString(stdin, line+"\n")
 	return err
 }
 
+/**
+ * Start logging for a process
+ *
+ * @TODO maybe it is in general a better idea to
+ * 1) Start logger from main-loop and pass io/stdin to the logger instead of starting if after the service.
+ *    This would have the advantage to leave *one* logger open.
+ * - OR -
+ * 2) Write a supervise which starts a service and logger (own program). Supervise then handles those.
+ *    Just like the original daemontools.
+ * - OR -
+ * 3) Keep a map of loggers<->services and then kill&replace it if needed
+ *
+ * @param chan error
+ * @param io.ReadCloser
+ */
 func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser) {
-	if s.service.Startups >= MAX_SERVICE_STARTUPS*2 {
-		LOGGER.Crit(fmt.Sprintf("logger %s has had too many startups in this session", s.service.Value))
-		if len(s.service.LogBuffer) > 0 {
-			LOGGER.Crit(fmt.Sprintf("%s - %s", s.service.Value, s.service.LogBuffer))
-			s.service.LogBuffer = nil
-		}
-		return
-	}
-
 	s.mutex.Lock()
 	s.service.LogCmd = exec.Command("./../multilog/multilog", "-path", "/"+s.service.Value)
 
@@ -179,16 +191,23 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 	case <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", s.service.Value))
 		if len(s.service.LogBuffer) > 0 {
-			s.startLogger(loggerDone, stdout)
+			//s.startLogger(loggerDone, stdout)
 		}
 		break
 	case err := <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", s.service.Value, err))
-		s.startLogger(loggerDone, stdout)
+		//s.startLogger(loggerDone, stdout)
 		break
 	}
 }
 
+/**
+ * Start a service
+ *
+ * @param chan error
+ * @param map[string]*Service
+ * @param string
+ */
 func (s *ServiceHandler) startService(srvDone chan error, runningServices map[string]*Service, serviceName string) {
 	if s.service.Startups >= CONFIG.ServiceConfig.MaxFailedStartups {
 		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", serviceName))
@@ -203,7 +222,6 @@ func (s *ServiceHandler) startService(srvDone chan error, runningServices map[st
 		return
 	}
 	LOGGER.Warning(fmt.Sprintf("Starting %s\n", s.service.Value))
-
 	s.service.Cmd = exec.Command("/" + s.service.Value + "/run")
 
 	stdout, _ := s.service.Cmd.StdoutPipe()
@@ -222,14 +240,27 @@ func (s *ServiceHandler) startService(srvDone chan error, runningServices map[st
 	select {
 	case err := <-srvDone:
 		LOGGER.Warning(fmt.Sprintf("restarting service %s, %s", serviceName, err))
+		for s.service.LogCmd == nil || s.service.LogCmd.Process == nil {
+			LOGGER.Crit("Waiting for logger to come up")
+			time.Sleep(1 * time.Second)
+		}
 		if s.service.LogCmd != nil && s.service.LogCmd.Process != nil {
+			LOGGER.Warning(fmt.Sprintf("Killing corresponding logger %s", s.service.LogCmd.Process))
 			loggerDone <- s.service.LogCmd.Process.Kill()
+		} else {
+			LOGGER.Crit(fmt.Sprintf("Could not find any logger for %s", serviceName))
 		}
 		time.Sleep(time.Duration(CONFIG.ServiceConfig.TimeWaitBetweenStartups) * time.Second)
 		s.startService(srvDone, runningServices, serviceName)
+		break
 	}
 }
 
+/**
+ * Display Usage
+ *
+ * @param int
+ */
 func usage(code int) {
 	fmt.Printf(
 		`go- %s - (c) 2015 Christian Senkowski

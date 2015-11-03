@@ -1,7 +1,7 @@
 {
     "ServiceConfig" : {
-        "path": "/Users/chris/services/",
-        "max_failed_startups": 50,
+        "path": "/home/adar/services/",
+        "max_failed_startups": 10,
         "time_between_startups": 1
     },
     "LogConfig" : {
