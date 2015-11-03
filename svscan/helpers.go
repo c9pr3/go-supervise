@@ -51,6 +51,26 @@ func removeSlashes(s *string) {
 }
 
 /**
+ * Update paths
+ *
+ * If servicePath has been altered there
+ * are actually the same services in database
+ * but the path changed.
+ *
+ * @return error
+ */
+func updateServicePaths(knownServices *map[string]*Service, servicePath *string) error {
+
+	for serviceName, service := range *knownServices {
+		if service.Value != (*servicePath)+"/"+serviceName {
+			service.Value = (*servicePath) + "/" + serviceName
+		}
+	}
+
+	return nil
+}
+
+/**
  * Prune old service from database before (re)starting it
  *
  * @param *[]string servicesInDirectory

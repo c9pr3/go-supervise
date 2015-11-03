@@ -83,9 +83,12 @@ func start() {
 
 			_, ok := runningServices[serviceName]
 			if ok != true {
+				// service is not yet running
+				// so start it and a logger
 				go func() {
-					err := removeServiceBefore(&servicesInDir, serviceName)
-					if err == nil {
+					err1 := updateServicePaths(&knownServices, servicePath)
+					err2 := removeServiceBefore(&servicesInDir, serviceName)
+					if err1 == nil && err2 == nil {
 						LOGGER.Debug(fmt.Sprintf("%s not yet running\n", serviceName))
 						time.Sleep(1 * time.Second)
 						sv := new(ServiceHandler)
@@ -95,6 +98,8 @@ func start() {
 					}
 				}()
 			} else {
+				// the service is running
+				// but might have been removed manually (rm)
 				err := removeServiceAfter(&servicesInDir, serviceName, runningServices[serviceName], srvDone)
 				if err == nil {
 					LOGGER.Debug(fmt.Sprintf("%s already running\n", serviceName))
@@ -167,6 +172,9 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 			break
 		}
 	}
+
+	loggerDone <- s.service.LogCmd.Wait()
+
 	select {
 	case <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done without errors", s.service.Value))
@@ -177,6 +185,7 @@ func (s *ServiceHandler) startLogger(loggerDone chan error, stdout io.ReadCloser
 	case err := <-loggerDone:
 		LOGGER.Warning(fmt.Sprintf("logger %s done with error = %v\n", s.service.Value, err))
 		s.startLogger(loggerDone, stdout)
+		break
 	}
 }
 
@@ -184,6 +193,7 @@ func (s *ServiceHandler) startService(srvDone chan error, runningServices map[st
 	if s.service.Startups >= CONFIG.ServiceConfig.MaxFailedStartups {
 		LOGGER.Crit(fmt.Sprintf("service %s has had too many startups in this session", serviceName))
 		return
+
 	}
 	loggerDone := make(chan error, 1)
 	s.mutex.Lock()
