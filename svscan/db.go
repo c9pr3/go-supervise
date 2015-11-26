@@ -56,6 +56,9 @@ func (d *DB) createNewServicesIfNeeded(servicesInDir *[]string, servicePath *str
 	count := 0
 
 	knownServices := d.getServices()
+	if knownServices == nil {
+		knownServices = make(map[string]*Service)
+	}
 
 	for _, dir := range *servicesInDir {
 		dir := dir
